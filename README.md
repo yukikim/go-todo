@@ -126,3 +126,30 @@ curl -X DELETE http://localhost:8080/todos/1
 ```bash
 curl -X PATCH http://localhost:8080/todos/1/complete
 ```
+
+---
+
+ファイル分割しました。動作は変えずに、役割ごとに整理しています。
+
+- [main.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/main.go:1)
+サーバー起動とルーティング登録だけ
+
+- [models.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/models.go:1)
+Todo, request 用 struct, メモリ保存用の todos / nextID
+
+- [handlers.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/handlers.go:1)
+GET / POST / PUT / DELETE / PATCH の handler 本体
+
+- [response.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/response.go:1)
+writeJSON, writeError, ErrorResponse
+
+#### 起動コマンド
+```bash
+go run .
+```
+
+#### 確認コマンド
+```bash
+curl http://localhost:8080/health
+curl http://localhost:8080/todos
+```
