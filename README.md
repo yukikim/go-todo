@@ -98,6 +98,8 @@ var todos = map[int]Todo{}
 var nextID = 1
 ```
 
+**以下の実装状況はコミットを参照**
+
 ---
 
 #### Todo 登録(POST)
