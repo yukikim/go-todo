@@ -16,6 +16,11 @@ type Todo struct {
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
+type CreateTodoRequest struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+}
+
 var todos = map[int]Todo{}
 var nextID = 1
 
@@ -24,7 +29,7 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "OK")
 	})
-	http.HandleFunc("/todos", getTodosHandler)
+	http.HandleFunc("/todos", todosHandler)
 
 	fmt.Println("server started at http://localhost:8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
@@ -32,17 +37,56 @@ func main() {
 	}
 }
 
-func getTodosHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+func todosHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		getTodosHandler(w, r)
+	case http.MethodPost:
+		createTodoHandler(w, r)
+	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
 	}
+}
 
+func getTodosHandler(w http.ResponseWriter, r *http.Request) {
 	todoList := make([]Todo, 0, len(todos))
 	for _, todo := range todos {
 		todoList = append(todoList, todo)
 	}
 
+	writeJSON(w, http.StatusOK, todoList)
+}
+
+func createTodoHandler(w http.ResponseWriter, r *http.Request) {
+	var req CreateTodoRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.Title == "" {
+		http.Error(w, "title is required", http.StatusBadRequest)
+		return
+	}
+
+	now := time.Now()
+	todo := Todo{
+		ID:          nextID,
+		Title:       req.Title,
+		Description: req.Description,
+		Completed:   false,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	todos[todo.ID] = todo
+	nextID++
+
+	writeJSON(w, http.StatusCreated, todo)
+}
+
+func writeJSON(w http.ResponseWriter, statusCode int, data any) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(todoList)
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(data)
 }
