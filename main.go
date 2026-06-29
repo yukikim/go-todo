@@ -65,6 +65,8 @@ func todoHandler(w http.ResponseWriter, r *http.Request) {
 		updateTodoHandler(w, r)
 	case http.MethodDelete:
 		deleteTodoHandler(w, r)
+	case http.MethodPatch:
+		completeTodoHandler(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
@@ -141,6 +143,12 @@ func getTodoIDFromPath(path string) (int, error) {
 	return strconv.Atoi(idText)
 }
 
+func getTodoIDFromCompletePath(path string) (int, error) {
+	idText := strings.TrimPrefix(path, "/todos/")
+	idText = strings.TrimSuffix(idText, "/complete")
+	return strconv.Atoi(idText)
+}
+
 func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := getTodoIDFromPath(r.URL.Path)
 	if err != nil {
@@ -188,6 +196,31 @@ func deleteTodoHandler(w http.ResponseWriter, r *http.Request) {
 
 	delete(todos, id)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func completeTodoHandler(w http.ResponseWriter, r *http.Request) {
+	if !strings.HasSuffix(r.URL.Path, "/complete") {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	id, err := getTodoIDFromCompletePath(r.URL.Path)
+	if err != nil {
+		http.Error(w, "invalid todo ID", http.StatusBadRequest)
+		return
+	}
+
+	todo, ok := todos[id]
+	if !ok {
+		http.Error(w, "todo not found", http.StatusNotFound)
+		return
+	}
+
+	todo.Completed = !todo.Completed
+	todo.UpdatedAt = time.Now()
+	todos[id] = todo
+
+	writeJSON(w, http.StatusOK, todo)
 }
 
 func writeJSON(w http.ResponseWriter, statusCode int, data any) {

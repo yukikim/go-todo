@@ -122,3 +122,7 @@ curl -X PUT http://localhost:8080/todos/1 \
 ```bash
 curl -X DELETE http://localhost:8080/todos/1
 ```
+#### 完了状態を切り替える処理
+```bash
+curl -X PATCH http://localhost:8080/todos/1/complete
+```

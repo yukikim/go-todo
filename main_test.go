@@ -186,3 +186,82 @@ func TestDeleteTodoHandlerNotFound(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
 	}
 }
+
+func TestCompleteTodoHandler(t *testing.T) {
+	now := time.Now()
+	todos = map[int]Todo{
+		1: {
+			ID:          1,
+			Title:       "完了にするTodo",
+			Description: "PATCH /todos/{id}/completeを作る",
+			Completed:   false,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+	}
+	nextID = 2
+
+	req := httptest.NewRequest(http.MethodPatch, "/todos/1/complete", nil)
+	rec := httptest.NewRecorder()
+
+	todoHandler(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	var todo Todo
+	if err := json.NewDecoder(rec.Body).Decode(&todo); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if !todo.Completed {
+		t.Fatalf("expected completed to be true")
+	}
+
+	if !todos[1].Completed {
+		t.Fatalf("expected todo in map to be completed")
+	}
+}
+
+func TestCompleteTodoHandlerTogglesBackToIncomplete(t *testing.T) {
+	now := time.Now()
+	todos = map[int]Todo{
+		1: {
+			ID:          1,
+			Title:       "未完了に戻すTodo",
+			Description: "PATCH /todos/{id}/completeを作る",
+			Completed:   true,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+	}
+	nextID = 2
+
+	req := httptest.NewRequest(http.MethodPatch, "/todos/1/complete", nil)
+	rec := httptest.NewRecorder()
+
+	todoHandler(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	if todos[1].Completed {
+		t.Fatalf("expected todo to be incomplete")
+	}
+}
+
+func TestCompleteTodoHandlerNotFound(t *testing.T) {
+	todos = map[int]Todo{}
+	nextID = 1
+
+	req := httptest.NewRequest(http.MethodPatch, "/todos/999/complete", nil)
+	rec := httptest.NewRecorder()
+
+	todoHandler(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
+	}
+}
