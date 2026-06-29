@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -30,6 +32,7 @@ func main() {
 		fmt.Fprintln(w, "OK")
 	})
 	http.HandleFunc("/todos", todosHandler)
+	http.HandleFunc("/todos/", todoHandler)
 
 	fmt.Println("server started at http://localhost:8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
@@ -43,6 +46,15 @@ func todosHandler(w http.ResponseWriter, r *http.Request) {
 		getTodosHandler(w, r)
 	case http.MethodPost:
 		createTodoHandler(w, r)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func todoHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		getTodoHandler(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
@@ -83,6 +95,23 @@ func createTodoHandler(w http.ResponseWriter, r *http.Request) {
 	nextID++
 
 	writeJSON(w, http.StatusCreated, todo)
+}
+
+func getTodoHandler(w http.ResponseWriter, r *http.Request) {
+	idText := strings.TrimPrefix(r.URL.Path, "/todos/")
+	id, err := strconv.Atoi(idText)
+	if err != nil {
+		http.Error(w, "invalid todo ID", http.StatusBadRequest)
+		return
+	}
+
+	todo, ok := todos[id]
+	if !ok {
+		http.Error(w, "todo not found", http.StatusNotFound)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, todo)
 }
 
 func writeJSON(w http.ResponseWriter, statusCode int, data any) {
