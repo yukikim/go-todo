@@ -1,0 +1,26 @@
+# Go build outputs
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Coverage reports
+*.out
+coverage.*
+
+# Local build/cache directories
+.gocache/
+bin/
+tmp/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/
