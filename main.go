@@ -63,6 +63,8 @@ func todoHandler(w http.ResponseWriter, r *http.Request) {
 		getTodoHandler(w, r)
 	case http.MethodPut:
 		updateTodoHandler(w, r)
+	case http.MethodDelete:
+		deleteTodoHandler(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
@@ -170,6 +172,22 @@ func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
 	todos[id] = todo
 
 	writeJSON(w, http.StatusOK, todo)
+}
+
+func deleteTodoHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := getTodoIDFromPath(r.URL.Path)
+	if err != nil {
+		http.Error(w, "invalid todo ID", http.StatusBadRequest)
+		return
+	}
+
+	if _, ok := todos[id]; !ok {
+		http.Error(w, "todo not found", http.StatusNotFound)
+		return
+	}
+
+	delete(todos, id)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func writeJSON(w http.ResponseWriter, statusCode int, data any) {

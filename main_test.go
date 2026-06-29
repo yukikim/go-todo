@@ -144,3 +144,45 @@ func TestUpdateTodoHandlerNotFound(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
 	}
 }
+
+func TestDeleteTodoHandler(t *testing.T) {
+	now := time.Now()
+	todos = map[int]Todo{
+		1: {
+			ID:          1,
+			Title:       "削除するTodo",
+			Description: "DELETE /todos/{id}を作る",
+			Completed:   false,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+	}
+	nextID = 2
+
+	req := httptest.NewRequest(http.MethodDelete, "/todos/1", nil)
+	rec := httptest.NewRecorder()
+
+	todoHandler(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, rec.Code)
+	}
+
+	if _, ok := todos[1]; ok {
+		t.Fatalf("expected todo to be deleted")
+	}
+}
+
+func TestDeleteTodoHandlerNotFound(t *testing.T) {
+	todos = map[int]Todo{}
+	nextID = 1
+
+	req := httptest.NewRequest(http.MethodDelete, "/todos/999", nil)
+	rec := httptest.NewRecorder()
+
+	todoHandler(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
+	}
+}
