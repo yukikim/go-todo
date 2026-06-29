@@ -97,3 +97,22 @@ type Todo struct {
 var todos = map[int]Todo{}
 var nextID = 1
 ```
+
+---
+
+#### Todo 登録(POST)
+```bash
+curl -X POST http://localhost:8080/todos \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Goを学習する","description":"POST /todosを作る"}'
+```
+#### Todo 取得(GET)
+```bash
+curl http://localhost:8080/todos/1
+```
+#### Todo 更新(PUT)
+```bash
+curl -X PUT http://localhost:8080/todos/1 \
+  -H "Content-Type: application/json" \
+  -d '{"title":"新しいタイトル","description":"新しい説明","completed":true}'
+```
