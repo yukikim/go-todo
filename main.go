@@ -29,6 +29,10 @@ type UpdateTodoRequest struct {
 	Completed   bool   `json:"completed"`
 }
 
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
 var todos = map[int]Todo{}
 var nextID = 1
 
@@ -53,7 +57,7 @@ func todosHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		createTodoHandler(w, r)
 	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
 }
 
@@ -68,7 +72,7 @@ func todoHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPatch:
 		completeTodoHandler(w, r)
 	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
 }
 
@@ -93,13 +97,13 @@ func createTodoHandler(w http.ResponseWriter, r *http.Request) {
 	// Goでは、関数に引数として渡すときに値をコピーするため、関数内で変更しても元の変数には影響しません。&を使うことで、変数のアドレスを渡し、関数内で変更した値が元の変数に反映されるようにしています
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		// JSONのデコードに失敗した場合、HTTPステータスコード400(Bad Request)を返す
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
 
 	// タイトルが空の場合Todoとして登録しない、HTTPステータスコード400(Bad Request)を返す
 	if req.Title == "" {
-		http.Error(w, "title is required", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "title is required")
 		return
 	}
 
@@ -125,13 +129,13 @@ func createTodoHandler(w http.ResponseWriter, r *http.Request) {
 func getTodoHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := getTodoIDFromPath(r.URL.Path)
 	if err != nil {
-		http.Error(w, "invalid todo ID", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid todo ID")
 		return
 	}
 
 	todo, ok := todos[id]
 	if !ok {
-		http.Error(w, "todo not found", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "todo not found")
 		return
 	}
 
@@ -152,24 +156,24 @@ func getTodoIDFromCompletePath(path string) (int, error) {
 func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := getTodoIDFromPath(r.URL.Path)
 	if err != nil {
-		http.Error(w, "invalid todo ID", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid todo ID")
 		return
 	}
 
 	todo, ok := todos[id]
 	if !ok {
-		http.Error(w, "todo not found", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "todo not found")
 		return
 	}
 
 	var req UpdateTodoRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
 
 	if req.Title == "" {
-		http.Error(w, "title is required", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "title is required")
 		return
 	}
 
@@ -185,12 +189,12 @@ func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
 func deleteTodoHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := getTodoIDFromPath(r.URL.Path)
 	if err != nil {
-		http.Error(w, "invalid todo ID", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid todo ID")
 		return
 	}
 
 	if _, ok := todos[id]; !ok {
-		http.Error(w, "todo not found", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "todo not found")
 		return
 	}
 
@@ -200,19 +204,19 @@ func deleteTodoHandler(w http.ResponseWriter, r *http.Request) {
 
 func completeTodoHandler(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasSuffix(r.URL.Path, "/complete") {
-		w.WriteHeader(http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "todo not found")
 		return
 	}
 
 	id, err := getTodoIDFromCompletePath(r.URL.Path)
 	if err != nil {
-		http.Error(w, "invalid todo ID", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid todo ID")
 		return
 	}
 
 	todo, ok := todos[id]
 	if !ok {
-		http.Error(w, "todo not found", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "todo not found")
 		return
 	}
 
@@ -221,6 +225,10 @@ func completeTodoHandler(w http.ResponseWriter, r *http.Request) {
 	todos[id] = todo
 
 	writeJSON(w, http.StatusOK, todo)
+}
+
+func writeError(w http.ResponseWriter, statusCode int, message string) {
+	writeJSON(w, statusCode, ErrorResponse{Error: message})
 }
 
 func writeJSON(w http.ResponseWriter, statusCode int, data any) {

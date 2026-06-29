@@ -86,6 +86,15 @@ func TestGetTodoHandlerNotFound(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
 	}
+
+	var errorResponse ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&errorResponse); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errorResponse.Error != "todo not found" {
+		t.Fatalf("expected error %q, got %q", "todo not found", errorResponse.Error)
+	}
 }
 
 func TestUpdateTodoHandler(t *testing.T) {
