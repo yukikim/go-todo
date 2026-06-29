@@ -23,6 +23,12 @@ type CreateTodoRequest struct {
 	Description string `json:"description"`
 }
 
+type UpdateTodoRequest struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Completed   bool   `json:"completed"`
+}
+
 var todos = map[int]Todo{}
 var nextID = 1
 
@@ -55,6 +61,8 @@ func todoHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		getTodoHandler(w, r)
+	case http.MethodPut:
+		updateTodoHandler(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
@@ -98,8 +106,7 @@ func createTodoHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getTodoHandler(w http.ResponseWriter, r *http.Request) {
-	idText := strings.TrimPrefix(r.URL.Path, "/todos/")
-	id, err := strconv.Atoi(idText)
+	id, err := getTodoIDFromPath(r.URL.Path)
 	if err != nil {
 		http.Error(w, "invalid todo ID", http.StatusBadRequest)
 		return
@@ -110,6 +117,44 @@ func getTodoHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "todo not found", http.StatusNotFound)
 		return
 	}
+
+	writeJSON(w, http.StatusOK, todo)
+}
+
+func getTodoIDFromPath(path string) (int, error) {
+	idText := strings.TrimPrefix(path, "/todos/")
+	return strconv.Atoi(idText)
+}
+
+func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := getTodoIDFromPath(r.URL.Path)
+	if err != nil {
+		http.Error(w, "invalid todo ID", http.StatusBadRequest)
+		return
+	}
+
+	todo, ok := todos[id]
+	if !ok {
+		http.Error(w, "todo not found", http.StatusNotFound)
+		return
+	}
+
+	var req UpdateTodoRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.Title == "" {
+		http.Error(w, "title is required", http.StatusBadRequest)
+		return
+	}
+
+	todo.Title = req.Title
+	todo.Description = req.Description
+	todo.Completed = req.Completed
+	todo.UpdatedAt = time.Now()
+	todos[id] = todo
 
 	writeJSON(w, http.StatusOK, todo)
 }

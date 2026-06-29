@@ -87,3 +87,60 @@ func TestGetTodoHandlerNotFound(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
 	}
 }
+
+func TestUpdateTodoHandler(t *testing.T) {
+	now := time.Now()
+	todos = map[int]Todo{
+		1: {
+			ID:          1,
+			Title:       "古いタイトル",
+			Description: "古い説明",
+			Completed:   false,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+	}
+	nextID = 2
+
+	body := bytes.NewBufferString(`{"title":"新しいタイトル","description":"新しい説明","completed":true}`)
+	req := httptest.NewRequest(http.MethodPut, "/todos/1", body)
+	rec := httptest.NewRecorder()
+
+	todoHandler(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	var todo Todo
+	if err := json.NewDecoder(rec.Body).Decode(&todo); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if todo.Title != "新しいタイトル" {
+		t.Fatalf("expected title %q, got %q", "新しいタイトル", todo.Title)
+	}
+
+	if !todo.Completed {
+		t.Fatalf("expected completed to be true")
+	}
+
+	if todos[1].Description != "新しい説明" {
+		t.Fatalf("expected todo in map to be updated")
+	}
+}
+
+func TestUpdateTodoHandlerNotFound(t *testing.T) {
+	todos = map[int]Todo{}
+	nextID = 1
+
+	body := bytes.NewBufferString(`{"title":"新しいタイトル","description":"新しい説明","completed":true}`)
+	req := httptest.NewRequest(http.MethodPut, "/todos/999", body)
+	rec := httptest.NewRecorder()
+
+	todoHandler(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
+	}
+}
