@@ -1,6 +1,9 @@
 package main
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 type Todo struct {
 	ID          int       `json:"id"`
@@ -22,5 +25,4 @@ type UpdateTodoRequest struct {
 	Completed   bool   `json:"completed"`
 }
 
-var todos = map[int]Todo{}
-var nextID = 1
+var errTodoNotFound = errors.New("todo not found")

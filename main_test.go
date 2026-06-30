@@ -10,8 +10,8 @@ import (
 )
 
 func TestCreateTodoHandler(t *testing.T) {
-	todos = map[int]Todo{}
-	nextID = 1
+	store := newMemoryTodoStore(nil, 1)
+	todoStore = store
 
 	body := bytes.NewBufferString(`{"title":"Goを学習する","description":"POST /todosを作る"}`)
 	req := httptest.NewRequest(http.MethodPost, "/todos", body)
@@ -36,14 +36,14 @@ func TestCreateTodoHandler(t *testing.T) {
 		t.Fatalf("expected title %q, got %q", "Goを学習する", todo.Title)
 	}
 
-	if _, ok := todos[todo.ID]; !ok {
+	if _, ok := store.todos[todo.ID]; !ok {
 		t.Fatalf("expected todo to be saved")
 	}
 }
 
 func TestGetTodoHandler(t *testing.T) {
 	now := time.Now()
-	todos = map[int]Todo{
+	todoStore = newMemoryTodoStore(map[int]Todo{
 		1: {
 			ID:          1,
 			Title:       "Goを学習する",
@@ -52,8 +52,7 @@ func TestGetTodoHandler(t *testing.T) {
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		},
-	}
-	nextID = 2
+	}, 2)
 
 	req := httptest.NewRequest(http.MethodGet, "/todos/1", nil)
 	rec := httptest.NewRecorder()
@@ -75,8 +74,7 @@ func TestGetTodoHandler(t *testing.T) {
 }
 
 func TestGetTodoHandlerNotFound(t *testing.T) {
-	todos = map[int]Todo{}
-	nextID = 1
+	todoStore = newMemoryTodoStore(nil, 1)
 
 	req := httptest.NewRequest(http.MethodGet, "/todos/999", nil)
 	rec := httptest.NewRecorder()
@@ -99,7 +97,7 @@ func TestGetTodoHandlerNotFound(t *testing.T) {
 
 func TestUpdateTodoHandler(t *testing.T) {
 	now := time.Now()
-	todos = map[int]Todo{
+	store := newMemoryTodoStore(map[int]Todo{
 		1: {
 			ID:          1,
 			Title:       "古いタイトル",
@@ -108,8 +106,8 @@ func TestUpdateTodoHandler(t *testing.T) {
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		},
-	}
-	nextID = 2
+	}, 2)
+	todoStore = store
 
 	body := bytes.NewBufferString(`{"title":"新しいタイトル","description":"新しい説明","completed":true}`)
 	req := httptest.NewRequest(http.MethodPut, "/todos/1", body)
@@ -134,14 +132,13 @@ func TestUpdateTodoHandler(t *testing.T) {
 		t.Fatalf("expected completed to be true")
 	}
 
-	if todos[1].Description != "新しい説明" {
+	if store.todos[1].Description != "新しい説明" {
 		t.Fatalf("expected todo in map to be updated")
 	}
 }
 
 func TestUpdateTodoHandlerNotFound(t *testing.T) {
-	todos = map[int]Todo{}
-	nextID = 1
+	todoStore = newMemoryTodoStore(nil, 1)
 
 	body := bytes.NewBufferString(`{"title":"新しいタイトル","description":"新しい説明","completed":true}`)
 	req := httptest.NewRequest(http.MethodPut, "/todos/999", body)
@@ -156,7 +153,7 @@ func TestUpdateTodoHandlerNotFound(t *testing.T) {
 
 func TestDeleteTodoHandler(t *testing.T) {
 	now := time.Now()
-	todos = map[int]Todo{
+	store := newMemoryTodoStore(map[int]Todo{
 		1: {
 			ID:          1,
 			Title:       "削除するTodo",
@@ -165,8 +162,8 @@ func TestDeleteTodoHandler(t *testing.T) {
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		},
-	}
-	nextID = 2
+	}, 2)
+	todoStore = store
 
 	req := httptest.NewRequest(http.MethodDelete, "/todos/1", nil)
 	rec := httptest.NewRecorder()
@@ -177,14 +174,13 @@ func TestDeleteTodoHandler(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusNoContent, rec.Code)
 	}
 
-	if _, ok := todos[1]; ok {
+	if _, ok := store.todos[1]; ok {
 		t.Fatalf("expected todo to be deleted")
 	}
 }
 
 func TestDeleteTodoHandlerNotFound(t *testing.T) {
-	todos = map[int]Todo{}
-	nextID = 1
+	todoStore = newMemoryTodoStore(nil, 1)
 
 	req := httptest.NewRequest(http.MethodDelete, "/todos/999", nil)
 	rec := httptest.NewRecorder()
@@ -198,7 +194,7 @@ func TestDeleteTodoHandlerNotFound(t *testing.T) {
 
 func TestCompleteTodoHandler(t *testing.T) {
 	now := time.Now()
-	todos = map[int]Todo{
+	store := newMemoryTodoStore(map[int]Todo{
 		1: {
 			ID:          1,
 			Title:       "完了にするTodo",
@@ -207,8 +203,8 @@ func TestCompleteTodoHandler(t *testing.T) {
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		},
-	}
-	nextID = 2
+	}, 2)
+	todoStore = store
 
 	req := httptest.NewRequest(http.MethodPatch, "/todos/1/complete", nil)
 	rec := httptest.NewRecorder()
@@ -228,14 +224,14 @@ func TestCompleteTodoHandler(t *testing.T) {
 		t.Fatalf("expected completed to be true")
 	}
 
-	if !todos[1].Completed {
+	if !store.todos[1].Completed {
 		t.Fatalf("expected todo in map to be completed")
 	}
 }
 
 func TestCompleteTodoHandlerTogglesBackToIncomplete(t *testing.T) {
 	now := time.Now()
-	todos = map[int]Todo{
+	store := newMemoryTodoStore(map[int]Todo{
 		1: {
 			ID:          1,
 			Title:       "未完了に戻すTodo",
@@ -244,8 +240,8 @@ func TestCompleteTodoHandlerTogglesBackToIncomplete(t *testing.T) {
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		},
-	}
-	nextID = 2
+	}, 2)
+	todoStore = store
 
 	req := httptest.NewRequest(http.MethodPatch, "/todos/1/complete", nil)
 	rec := httptest.NewRecorder()
@@ -256,14 +252,13 @@ func TestCompleteTodoHandlerTogglesBackToIncomplete(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 
-	if todos[1].Completed {
+	if store.todos[1].Completed {
 		t.Fatalf("expected todo to be incomplete")
 	}
 }
 
 func TestCompleteTodoHandlerNotFound(t *testing.T) {
-	todos = map[int]Todo{}
-	nextID = 1
+	todoStore = newMemoryTodoStore(nil, 1)
 
 	req := httptest.NewRequest(http.MethodPatch, "/todos/999/complete", nil)
 	rec := httptest.NewRecorder()

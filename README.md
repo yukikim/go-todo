@@ -135,7 +135,7 @@ curl -X PATCH http://localhost:8080/todos/1/complete
 サーバー起動とルーティング登録だけ
 
 - [models.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/models.go:1)
-Todo, request 用 struct, メモリ保存用の todos / nextID
+Todo, request 用 struct
 
 - [handlers.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/handlers.go:1)
 GET / POST / PUT / DELETE / PATCH の handler 本体
@@ -143,7 +143,34 @@ GET / POST / PUT / DELETE / PATCH の handler 本体
 - [response.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/response.go:1)
 writeJSON, writeError, ErrorResponse
 
+---
+
+## PostgreSQL に保存する
+
+現在の実装では、Todo をメモリ上の map ではなく PostgreSQL に保存します。
+
+### PostgreSQL 起動
+
+```bash
+docker compose up -d postgres
+```
+
+### 環境変数
+
+未指定の場合は、以下の接続先を使います。
+
+```bash
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/go_todo?sslmode=disable
+```
+
+別の接続先を使う場合は、起動前に `DATABASE_URL` を指定してください。
+
+```bash
+export DATABASE_URL="postgres://postgres:postgres@localhost:5432/go_todo?sslmode=disable"
+```
+
 #### 起動コマンド
+
 ```bash
 go run .
 ```

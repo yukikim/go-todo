@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 )
 
 func todosHandler(w http.ResponseWriter, r *http.Request) {
@@ -35,17 +35,13 @@ func todoHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getTodosHandler(w http.ResponseWriter, r *http.Request) {
-	// Todoのスライスを作成し、todosマップの長さを初期容量として設定 make(型、　長さ、　容量)
-	todoList := make([]Todo, 0, len(todos)) // todosはTodoのマップ(連想配列)なので、len(todos)で要素数を取得できる
-	// rangeは、配列やスライス、マップなどの要素を順番に取り出すための構文です
-	for _, todo := range todos { // _, は「無視する」という意味(idは使わない)で、todoはtodosマップの中身だけを順番に取り出すための変数です
-		// todosマップの各要素を順番に取り出し、todoListスライスに追加しています
-		// マップのまま返すと、JSONのキーが文字列になるため、スライスに変換して返すことで、JSONの配列として返すことができます
-		todoList = append(todoList, todo)
+	todos, err := todoStore.ListTodos(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list todos")
+		return
 	}
 
-	// todoListをJSON形式でレスポンスとして返すために、writeJSON関数を呼び出しています
-	writeJSON(w, http.StatusOK, todoList)
+	writeJSON(w, http.StatusOK, todos)
 }
 
 func createTodoHandler(w http.ResponseWriter, r *http.Request) {
@@ -65,20 +61,11 @@ func createTodoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	now := time.Now() // 現在時刻を取得
-	// Todo構造体を作成し、ID、タイトル、説明、完了状態、作成日時、更新日時を設定
-	todo := Todo{
-		ID:          nextID,
-		Title:       req.Title,
-		Description: req.Description,
-		Completed:   false,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+	todo, err := todoStore.CreateTodo(r.Context(), req)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create todo")
+		return
 	}
-
-	// 作成したTodoをメモリ上のtodosマップに追加し、次のIDをインクリメント
-	todos[todo.ID] = todo
-	nextID++
 
 	// 作成したTodoをJSON形式でレスポンスとして返すために、writeJSON関数を呼び出しています
 	writeJSON(w, http.StatusCreated, todo)
@@ -91,9 +78,13 @@ func getTodoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	todo, ok := todos[id]
-	if !ok {
+	todo, err := todoStore.GetTodo(r.Context(), id)
+	if errors.Is(err, errTodoNotFound) {
 		writeError(w, http.StatusNotFound, "todo not found")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get todo")
 		return
 	}
 
@@ -118,9 +109,13 @@ func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	todo, ok := todos[id]
-	if !ok {
+	_, err = todoStore.GetTodo(r.Context(), id)
+	if errors.Is(err, errTodoNotFound) {
 		writeError(w, http.StatusNotFound, "todo not found")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get todo")
 		return
 	}
 
@@ -135,11 +130,11 @@ func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	todo.Title = req.Title
-	todo.Description = req.Description
-	todo.Completed = req.Completed
-	todo.UpdatedAt = time.Now()
-	todos[id] = todo
+	todo, err := todoStore.UpdateTodo(r.Context(), id, req)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update todo")
+		return
+	}
 
 	writeJSON(w, http.StatusOK, todo)
 }
@@ -151,12 +146,16 @@ func deleteTodoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, ok := todos[id]; !ok {
+	err = todoStore.DeleteTodo(r.Context(), id)
+	if errors.Is(err, errTodoNotFound) {
 		writeError(w, http.StatusNotFound, "todo not found")
 		return
 	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to delete todo")
+		return
+	}
 
-	delete(todos, id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -172,15 +171,15 @@ func completeTodoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	todo, ok := todos[id]
-	if !ok {
+	todo, err := todoStore.ToggleTodoComplete(r.Context(), id)
+	if errors.Is(err, errTodoNotFound) {
 		writeError(w, http.StatusNotFound, "todo not found")
 		return
 	}
-
-	todo.Completed = !todo.Completed
-	todo.UpdatedAt = time.Now()
-	todos[id] = todo
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update todo")
+		return
+	}
 
 	writeJSON(w, http.StatusOK, todo)
 }
