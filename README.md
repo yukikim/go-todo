@@ -180,3 +180,75 @@ go run .
 curl http://localhost:8080/health
 curl http://localhost:8080/todos
 ```
+
+---
+
+## Gin を使ったルーティング
+
+現在の実装では、標準ライブラリの `http.HandleFunc` ではなく、`Gin` を使ってルーティングしています。
+
+Gin は Go 製の Web フレームワークです。標準ライブラリだけでも API は作れますが、Gin を使うとルーティング、パスパラメータ取得、JSON の入力・出力などを短く書けます。
+
+### 導入パッケージ
+
+```bash
+go get github.com/gin-gonic/gin
+```
+
+### ルーティング例
+
+```go
+r.GET("/todos", getTodosHandler)
+r.POST("/todos", createTodoHandler)
+r.GET("/todos/:id", getTodoHandler)
+r.PUT("/todos/:id", updateTodoHandler)
+r.DELETE("/todos/:id", deleteTodoHandler)
+r.PATCH("/todos/:id/complete", completeTodoHandler)
+```
+
+標準ライブラリだけで書く場合は、`/todos` と `/todos/` を分けて登録したり、handler の中で `switch r.Method` を使って HTTP メソッドを判定したりする必要がありました。
+
+Gin では `GET`, `POST`, `PUT`, `DELETE`, `PATCH` をルーティング定義で分けられるため、handler の責務がシンプルになります。
+
+### メリット
+
+- ルーティングを読みやすく書ける
+- `/todos/:id` のようにパスパラメータを扱いやすい
+- JSON リクエストを `ShouldBindJSON` で構造体に変換できる
+- JSON レスポンスを `c.JSON` で返せる
+- 存在しないルートや許可していないメソッドの処理をまとめて定義できる
+- middleware を追加しやすい
+
+### 今回の実装で変わった点
+
+ID の取得は、文字列操作ではなく Gin の `Param` を使います。
+
+```go
+idText := c.Param("id")
+```
+
+JSON リクエストの読み取りは、`json.NewDecoder` ではなく `ShouldBindJSON` を使います。
+
+```go
+var req CreateTodoRequest
+if err := c.ShouldBindJSON(&req); err != nil {
+	writeError(c, http.StatusBadRequest, "invalid JSON")
+	return
+}
+```
+
+JSON レスポンスは `c.JSON` で返します。
+
+```go
+c.JSON(http.StatusCreated, todo)
+```
+
+### 注意点
+
+- 標準ライブラリだけの実装より依存パッケージが増える
+- Gin 独自の `*gin.Context` に依存するため、handler の書き方が標準の `http.HandlerFunc` とは変わる
+- テストでは handler を直接呼ぶより、Gin の router 経由でリクエストする方が自然
+- 小さな API では標準ライブラリだけでも十分な場合がある
+- フレームワークの便利さに頼りすぎると、HTTP の基本処理が見えにくくなることがある
+
+学習目的では、まず標準ライブラリで API の仕組みを理解し、その後に Gin を導入すると違いが分かりやすいです。

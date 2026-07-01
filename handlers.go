@@ -1,185 +1,148 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
-	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
-func todosHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		getTodosHandler(w, r)
-	case http.MethodPost:
-		createTodoHandler(w, r)
-	default:
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-	}
-}
-
-func todoHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		getTodoHandler(w, r)
-	case http.MethodPut:
-		updateTodoHandler(w, r)
-	case http.MethodDelete:
-		deleteTodoHandler(w, r)
-	case http.MethodPatch:
-		completeTodoHandler(w, r)
-	default:
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-	}
-}
-
-func getTodosHandler(w http.ResponseWriter, r *http.Request) {
-	todos, err := todoStore.ListTodos(r.Context())
+func getTodosHandler(c *gin.Context) {
+	todos, err := todoStore.ListTodos(c.Request.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to list todos")
+		writeError(c, http.StatusInternalServerError, "failed to list todos")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, todos)
+	c.JSON(http.StatusOK, todos)
 }
 
-func createTodoHandler(w http.ResponseWriter, r *http.Request) {
+func createTodoHandler(c *gin.Context) {
 	// リクエストのJSONを格納するための構造体を作成(CreateTodoRequestはTypescriptのinterfaceのようなもの)
 	var req CreateTodoRequest
-	// json.NewDecoder(r.Body)でリクエストボディをデコードし、reqに格納する(&reqの&はreqの住所を渡すことで、関数内でreqの値を変更できるようにするため)
-	// Goでは、関数に引数として渡すときに値をコピーするため、関数内で変更しても元の変数には影響しません。&を使うことで、変数のアドレスを渡し、関数内で変更した値が元の変数に反映されるようにしています
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// ShouldBindJSONでリクエストボディをデコードし、reqに格納する
+	if err := c.ShouldBindJSON(&req); err != nil {
 		// JSONのデコードに失敗した場合、HTTPステータスコード400(Bad Request)を返す
-		writeError(w, http.StatusBadRequest, "invalid JSON")
+		writeError(c, http.StatusBadRequest, "invalid JSON")
 		return
 	}
 
 	// タイトルが空の場合Todoとして登録しない、HTTPステータスコード400(Bad Request)を返す
 	if req.Title == "" {
-		writeError(w, http.StatusBadRequest, "title is required")
+		writeError(c, http.StatusBadRequest, "title is required")
 		return
 	}
 
-	todo, err := todoStore.CreateTodo(r.Context(), req)
+	todo, err := todoStore.CreateTodo(c.Request.Context(), req)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create todo")
+		writeError(c, http.StatusInternalServerError, "failed to create todo")
 		return
 	}
 
-	// 作成したTodoをJSON形式でレスポンスとして返すために、writeJSON関数を呼び出しています
-	writeJSON(w, http.StatusCreated, todo)
+	// 作成したTodoをJSON形式でレスポンスとして返す
+	c.JSON(http.StatusCreated, todo)
 }
 
-func getTodoHandler(w http.ResponseWriter, r *http.Request) {
-	id, err := getTodoIDFromPath(r.URL.Path)
+func getTodoHandler(c *gin.Context) {
+	id, err := getTodoIDFromContext(c)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid todo ID")
+		writeError(c, http.StatusBadRequest, "invalid todo ID")
 		return
 	}
 
-	todo, err := todoStore.GetTodo(r.Context(), id)
+	todo, err := todoStore.GetTodo(c.Request.Context(), id)
 	if errors.Is(err, errTodoNotFound) {
-		writeError(w, http.StatusNotFound, "todo not found")
+		writeError(c, http.StatusNotFound, "todo not found")
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get todo")
+		writeError(c, http.StatusInternalServerError, "failed to get todo")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, todo)
+	c.JSON(http.StatusOK, todo)
 }
 
-func getTodoIDFromPath(path string) (int, error) {
-	idText := strings.TrimPrefix(path, "/todos/")
+func getTodoIDFromContext(c *gin.Context) (int, error) {
+	// *gin.Context.Param() は、URLパラメータを取得するためのメソッドです。例えば、URLが /todos/123 の場合、c.Param("id") は "123" を返します。
+	idText := c.Param("id")
 	return strconv.Atoi(idText)
 }
 
-func getTodoIDFromCompletePath(path string) (int, error) {
-	idText := strings.TrimPrefix(path, "/todos/")
-	idText = strings.TrimSuffix(idText, "/complete")
-	return strconv.Atoi(idText)
-}
-
-func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
-	id, err := getTodoIDFromPath(r.URL.Path)
+func updateTodoHandler(c *gin.Context) {
+	id, err := getTodoIDFromContext(c)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid todo ID")
+		writeError(c, http.StatusBadRequest, "invalid todo ID")
 		return
 	}
 
-	_, err = todoStore.GetTodo(r.Context(), id)
+	_, err = todoStore.GetTodo(c.Request.Context(), id)
 	if errors.Is(err, errTodoNotFound) {
-		writeError(w, http.StatusNotFound, "todo not found")
+		writeError(c, http.StatusNotFound, "todo not found")
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get todo")
+		writeError(c, http.StatusInternalServerError, "failed to get todo")
 		return
 	}
 
 	var req UpdateTodoRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON")
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeError(c, http.StatusBadRequest, "invalid JSON")
 		return
 	}
 
 	if req.Title == "" {
-		writeError(w, http.StatusBadRequest, "title is required")
+		writeError(c, http.StatusBadRequest, "title is required")
 		return
 	}
 
-	todo, err := todoStore.UpdateTodo(r.Context(), id, req)
+	todo, err := todoStore.UpdateTodo(c.Request.Context(), id, req)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to update todo")
+		writeError(c, http.StatusInternalServerError, "failed to update todo")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, todo)
+	c.JSON(http.StatusOK, todo)
 }
 
-func deleteTodoHandler(w http.ResponseWriter, r *http.Request) {
-	id, err := getTodoIDFromPath(r.URL.Path)
+func deleteTodoHandler(c *gin.Context) {
+	id, err := getTodoIDFromContext(c)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid todo ID")
+		writeError(c, http.StatusBadRequest, "invalid todo ID")
 		return
 	}
 
-	err = todoStore.DeleteTodo(r.Context(), id)
+	err = todoStore.DeleteTodo(c.Request.Context(), id)
 	if errors.Is(err, errTodoNotFound) {
-		writeError(w, http.StatusNotFound, "todo not found")
+		writeError(c, http.StatusNotFound, "todo not found")
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to delete todo")
+		writeError(c, http.StatusInternalServerError, "failed to delete todo")
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	c.Status(http.StatusNoContent)
 }
 
-func completeTodoHandler(w http.ResponseWriter, r *http.Request) {
-	if !strings.HasSuffix(r.URL.Path, "/complete") {
-		writeError(w, http.StatusNotFound, "todo not found")
-		return
-	}
-
-	id, err := getTodoIDFromCompletePath(r.URL.Path)
+func completeTodoHandler(c *gin.Context) {
+	id, err := getTodoIDFromContext(c)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid todo ID")
+		writeError(c, http.StatusBadRequest, "invalid todo ID")
 		return
 	}
 
-	todo, err := todoStore.ToggleTodoComplete(r.Context(), id)
+	todo, err := todoStore.ToggleTodoComplete(c.Request.Context(), id)
 	if errors.Is(err, errTodoNotFound) {
-		writeError(w, http.StatusNotFound, "todo not found")
+		writeError(c, http.StatusNotFound, "todo not found")
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to update todo")
+		writeError(c, http.StatusInternalServerError, "failed to update todo")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, todo)
+	c.JSON(http.StatusOK, todo)
 }

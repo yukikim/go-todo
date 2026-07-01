@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 )
 
@@ -19,17 +18,11 @@ func main() {
 	}
 	defer db.Close()
 
+	// NewPostgresStore関数(./postgres_store.go)を呼び出して、PostgresStoreのインスタンスを作成し、todoStore変数に代入する
 	todoStore = NewPostgresStore(db)
 
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "OK")
-	})
-	http.HandleFunc("/todos", todosHandler)
-	http.HandleFunc("/todos/", todoHandler)
-
 	fmt.Println("server started at http://localhost:8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	if err := newRouter().Run(":8080"); err != nil {
 		fmt.Println("server error:", err)
 	}
 }
