@@ -18,8 +18,9 @@ func main() {
 	}
 	defer db.Close()
 
-	// NewPostgresStore関数(./postgres_store.go)を呼び出して、PostgresStoreのインスタンスを作成し、todoStore変数に代入する
+	// PostgreSQLとやり取りするStoreを作成し、TodoStore interfaceとして保持する
 	todoStore = NewPostgresStore(db)
+	// StoreをServiceに渡し、handlerからはService経由でTodoの処理を呼び出す
 	todoService = NewTodoService(todoStore)
 
 	fmt.Println("server started at http://localhost:8080")
