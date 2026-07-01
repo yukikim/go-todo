@@ -20,6 +20,7 @@ func main() {
 
 	// NewPostgresStore関数(./postgres_store.go)を呼び出して、PostgresStoreのインスタンスを作成し、todoStore変数に代入する
 	todoStore = NewPostgresStore(db)
+	todoService = NewTodoService(todoStore)
 
 	fmt.Println("server started at http://localhost:8080")
 	if err := newRouter().Run(":8080"); err != nil {

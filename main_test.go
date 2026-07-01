@@ -12,6 +12,7 @@ import (
 func TestCreateTodoHandler(t *testing.T) {
 	store := newMemoryTodoStore(nil, 1)
 	todoStore = store
+	todoService = NewTodoService(store)
 
 	body := bytes.NewBufferString(`{"title":"Goを学習する","description":"POST /todosを作る"}`)
 	req := httptest.NewRequest(http.MethodPost, "/todos", body)
@@ -43,7 +44,7 @@ func TestCreateTodoHandler(t *testing.T) {
 
 func TestGetTodoHandler(t *testing.T) {
 	now := time.Now()
-	todoStore = newMemoryTodoStore(map[int]Todo{
+	store := newMemoryTodoStore(map[int]Todo{
 		1: {
 			ID:          1,
 			Title:       "Goを学習する",
@@ -53,6 +54,8 @@ func TestGetTodoHandler(t *testing.T) {
 			UpdatedAt:   now,
 		},
 	}, 2)
+	todoStore = store
+	todoService = NewTodoService(store)
 
 	req := httptest.NewRequest(http.MethodGet, "/todos/1", nil)
 	rec := httptest.NewRecorder()
@@ -74,7 +77,9 @@ func TestGetTodoHandler(t *testing.T) {
 }
 
 func TestGetTodoHandlerNotFound(t *testing.T) {
-	todoStore = newMemoryTodoStore(nil, 1)
+	store := newMemoryTodoStore(nil, 1)
+	todoStore = store
+	todoService = NewTodoService(store)
 
 	req := httptest.NewRequest(http.MethodGet, "/todos/999", nil)
 	rec := httptest.NewRecorder()
@@ -108,6 +113,7 @@ func TestUpdateTodoHandler(t *testing.T) {
 		},
 	}, 2)
 	todoStore = store
+	todoService = NewTodoService(store)
 
 	body := bytes.NewBufferString(`{"title":"新しいタイトル","description":"新しい説明","completed":true}`)
 	req := httptest.NewRequest(http.MethodPut, "/todos/1", body)
@@ -138,7 +144,9 @@ func TestUpdateTodoHandler(t *testing.T) {
 }
 
 func TestUpdateTodoHandlerNotFound(t *testing.T) {
-	todoStore = newMemoryTodoStore(nil, 1)
+	store := newMemoryTodoStore(nil, 1)
+	todoStore = store
+	todoService = NewTodoService(store)
 
 	body := bytes.NewBufferString(`{"title":"新しいタイトル","description":"新しい説明","completed":true}`)
 	req := httptest.NewRequest(http.MethodPut, "/todos/999", body)
@@ -164,6 +172,7 @@ func TestDeleteTodoHandler(t *testing.T) {
 		},
 	}, 2)
 	todoStore = store
+	todoService = NewTodoService(store)
 
 	req := httptest.NewRequest(http.MethodDelete, "/todos/1", nil)
 	rec := httptest.NewRecorder()
@@ -180,7 +189,9 @@ func TestDeleteTodoHandler(t *testing.T) {
 }
 
 func TestDeleteTodoHandlerNotFound(t *testing.T) {
-	todoStore = newMemoryTodoStore(nil, 1)
+	store := newMemoryTodoStore(nil, 1)
+	todoStore = store
+	todoService = NewTodoService(store)
 
 	req := httptest.NewRequest(http.MethodDelete, "/todos/999", nil)
 	rec := httptest.NewRecorder()
@@ -205,6 +216,7 @@ func TestCompleteTodoHandler(t *testing.T) {
 		},
 	}, 2)
 	todoStore = store
+	todoService = NewTodoService(store)
 
 	req := httptest.NewRequest(http.MethodPatch, "/todos/1/complete", nil)
 	rec := httptest.NewRecorder()
@@ -242,6 +254,7 @@ func TestCompleteTodoHandlerTogglesBackToIncomplete(t *testing.T) {
 		},
 	}, 2)
 	todoStore = store
+	todoService = NewTodoService(store)
 
 	req := httptest.NewRequest(http.MethodPatch, "/todos/1/complete", nil)
 	rec := httptest.NewRecorder()
@@ -258,7 +271,9 @@ func TestCompleteTodoHandlerTogglesBackToIncomplete(t *testing.T) {
 }
 
 func TestCompleteTodoHandlerNotFound(t *testing.T) {
-	todoStore = newMemoryTodoStore(nil, 1)
+	store := newMemoryTodoStore(nil, 1)
+	todoStore = store
+	todoService = NewTodoService(store)
 
 	req := httptest.NewRequest(http.MethodPatch, "/todos/999/complete", nil)
 	rec := httptest.NewRecorder()

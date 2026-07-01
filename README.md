@@ -145,6 +145,107 @@ writeJSON, writeError, ErrorResponse
 
 ---
 
+## レイヤー分割
+
+現在の実装では、処理を `handler` / `service` / `store` に分けています。
+
+```txt
+HTTP request
+  ↓
+handler
+  ↓
+service
+  ↓
+store
+  ↓
+PostgreSQL
+```
+
+### handler 層
+
+`handlers.go` が handler 層です。
+
+handler は、HTTP リクエストとレスポンスを扱います。
+
+- URL パラメータを取得する
+- JSON リクエストを構造体に変換する
+- service を呼び出す
+- HTTP ステータスコードと JSON レスポンスを返す
+
+Gin を使っているため、handler は `*gin.Context` を受け取ります。
+
+```go
+func getTodoHandler(c *gin.Context) {
+	id, err := getTodoIDFromContext(c)
+	if err != nil {
+		writeError(c, http.StatusBadRequest, "invalid todo ID")
+		return
+	}
+
+	todo, err := todoService.GetTodo(c.Request.Context(), id)
+	// ...
+}
+```
+
+### service 層
+
+`service.go` が service 層です。
+
+service は、Todo API の処理ルールを担当します。
+
+- Todo を作成する前に title を確認する
+- Todo を更新する前に title を確認する
+- store を呼び出して保存・取得・更新・削除する
+
+例えば、`title` が空かどうかの確認は handler ではなく service 側で行います。
+
+```go
+func (s *TodoService) CreateTodo(ctx context.Context, req CreateTodoRequest) (Todo, error) {
+	if req.Title == "" {
+		return Todo{}, errTitleRequired
+	}
+
+	return s.store.CreateTodo(ctx, req)
+}
+```
+
+### store 層
+
+`store.go` と `postgres_store.go` が store 層です。
+
+store は、データの保存先とのやり取りを担当します。
+
+- PostgreSQL から Todo 一覧を取得する
+- PostgreSQL に Todo を登録する
+- PostgreSQL の Todo を更新・削除する
+
+`store.go` では、保存処理に必要なメソッドを `TodoStore` interface として定義しています。
+
+```go
+type TodoStore interface {
+	ListTodos(ctx context.Context) ([]Todo, error)
+	CreateTodo(ctx context.Context, req CreateTodoRequest) (Todo, error)
+	GetTodo(ctx context.Context, id int) (Todo, error)
+	UpdateTodo(ctx context.Context, id int, req UpdateTodoRequest) (Todo, error)
+	DeleteTodo(ctx context.Context, id int) error
+	ToggleTodoComplete(ctx context.Context, id int) (Todo, error)
+}
+```
+
+実際の PostgreSQL 処理は `postgres_store.go` にあります。
+
+### レイヤー分割のメリット
+
+- handler が HTTP の処理に集中できる
+- service に処理ルールを集められる
+- store を差し替えやすくなる
+- テストで PostgreSQL ではなくメモリ実装を使いやすい
+- コードの責務が分かりやすくなる
+
+今回のテストでは、PostgreSQL ではなく `memory_store_test.go` のメモリ実装を使っています。handler は service を呼ぶだけなので、本番は PostgreSQL、テストはメモリ、という差し替えがしやすくなっています。
+
+---
+
 ## PostgreSQL に保存する
 
 現在の実装では、Todo をメモリ上の map ではなく PostgreSQL に保存します。

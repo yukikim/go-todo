@@ -20,5 +20,9 @@ type TodoStore interface {
 }
 
 // TodoStoreのインスタンスを保持する変数を定義する
-// handlers.go では、todoStore.ListTodos()のように、TodoStoreのメソッドを呼び出すことで、DBとのやり取りを行うことができます
+// service.go では、todoStore.ListTodos()のように、TodoStoreのメソッドを呼び出すことで、DBとのやり取りを行うことができます
 var todoStore TodoStore
+
+// TodoServiceのインスタンスを保持する変数を定義する
+// handlers.go では、todoService.ListTodos()のように、TodoServiceのメソッドを呼び出すことで、Todoの処理を行うことができます
+var todoService *TodoService

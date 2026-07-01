@@ -9,7 +9,7 @@ import (
 )
 
 func getTodosHandler(c *gin.Context) {
-	todos, err := todoStore.ListTodos(c.Request.Context())
+	todos, err := todoService.ListTodos(c.Request.Context())
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "failed to list todos")
 		return
@@ -28,13 +28,11 @@ func createTodoHandler(c *gin.Context) {
 		return
 	}
 
-	// タイトルが空の場合Todoとして登録しない、HTTPステータスコード400(Bad Request)を返す
-	if req.Title == "" {
+	todo, err := todoService.CreateTodo(c.Request.Context(), req)
+	if errors.Is(err, errTitleRequired) {
 		writeError(c, http.StatusBadRequest, "title is required")
 		return
 	}
-
-	todo, err := todoStore.CreateTodo(c.Request.Context(), req)
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "failed to create todo")
 		return
@@ -51,7 +49,7 @@ func getTodoHandler(c *gin.Context) {
 		return
 	}
 
-	todo, err := todoStore.GetTodo(c.Request.Context(), id)
+	todo, err := todoService.GetTodo(c.Request.Context(), id)
 	if errors.Is(err, errTodoNotFound) {
 		writeError(c, http.StatusNotFound, "todo not found")
 		return
@@ -77,28 +75,21 @@ func updateTodoHandler(c *gin.Context) {
 		return
 	}
 
-	_, err = todoStore.GetTodo(c.Request.Context(), id)
-	if errors.Is(err, errTodoNotFound) {
-		writeError(c, http.StatusNotFound, "todo not found")
-		return
-	}
-	if err != nil {
-		writeError(c, http.StatusInternalServerError, "failed to get todo")
-		return
-	}
-
 	var req UpdateTodoRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		writeError(c, http.StatusBadRequest, "invalid JSON")
 		return
 	}
 
-	if req.Title == "" {
+	todo, err := todoService.UpdateTodo(c.Request.Context(), id, req)
+	if errors.Is(err, errTitleRequired) {
 		writeError(c, http.StatusBadRequest, "title is required")
 		return
 	}
-
-	todo, err := todoStore.UpdateTodo(c.Request.Context(), id, req)
+	if errors.Is(err, errTodoNotFound) {
+		writeError(c, http.StatusNotFound, "todo not found")
+		return
+	}
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "failed to update todo")
 		return
@@ -114,7 +105,7 @@ func deleteTodoHandler(c *gin.Context) {
 		return
 	}
 
-	err = todoStore.DeleteTodo(c.Request.Context(), id)
+	err = todoService.DeleteTodo(c.Request.Context(), id)
 	if errors.Is(err, errTodoNotFound) {
 		writeError(c, http.StatusNotFound, "todo not found")
 		return
@@ -134,7 +125,7 @@ func completeTodoHandler(c *gin.Context) {
 		return
 	}
 
-	todo, err := todoStore.ToggleTodoComplete(c.Request.Context(), id)
+	todo, err := todoService.ToggleTodoComplete(c.Request.Context(), id)
 	if errors.Is(err, errTodoNotFound) {
 		writeError(c, http.StatusNotFound, "todo not found")
 		return
