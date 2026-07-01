@@ -5,34 +5,9 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"strings"
+
+	"github.com/go-chi/chi/v5"
 )
-
-func todosHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		getTodosHandler(w, r)
-	case http.MethodPost:
-		createTodoHandler(w, r)
-	default:
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-	}
-}
-
-func todoHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		getTodoHandler(w, r)
-	case http.MethodPut:
-		updateTodoHandler(w, r)
-	case http.MethodDelete:
-		deleteTodoHandler(w, r)
-	case http.MethodPatch:
-		completeTodoHandler(w, r)
-	default:
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-	}
-}
 
 func getTodosHandler(w http.ResponseWriter, r *http.Request) {
 	todos, err := todoStore.ListTodos(r.Context())
@@ -72,7 +47,7 @@ func createTodoHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getTodoHandler(w http.ResponseWriter, r *http.Request) {
-	id, err := getTodoIDFromPath(r.URL.Path)
+	id, err := getTodoIDFromRequest(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid todo ID")
 		return
@@ -91,19 +66,14 @@ func getTodoHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, todo)
 }
 
-func getTodoIDFromPath(path string) (int, error) {
-	idText := strings.TrimPrefix(path, "/todos/")
-	return strconv.Atoi(idText)
-}
-
-func getTodoIDFromCompletePath(path string) (int, error) {
-	idText := strings.TrimPrefix(path, "/todos/")
-	idText = strings.TrimSuffix(idText, "/complete")
+func getTodoIDFromRequest(r *http.Request) (int, error) {
+	// chi.URLParam(r, "id")でURLパラメータからidを取得し、strconv.Atoiで文字列を整数に変換しています
+	idText := chi.URLParam(r, "id")
 	return strconv.Atoi(idText)
 }
 
 func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
-	id, err := getTodoIDFromPath(r.URL.Path)
+	id, err := getTodoIDFromRequest(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid todo ID")
 		return
@@ -140,7 +110,7 @@ func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func deleteTodoHandler(w http.ResponseWriter, r *http.Request) {
-	id, err := getTodoIDFromPath(r.URL.Path)
+	id, err := getTodoIDFromRequest(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid todo ID")
 		return
@@ -160,12 +130,7 @@ func deleteTodoHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func completeTodoHandler(w http.ResponseWriter, r *http.Request) {
-	if !strings.HasSuffix(r.URL.Path, "/complete") {
-		writeError(w, http.StatusNotFound, "todo not found")
-		return
-	}
-
-	id, err := getTodoIDFromCompletePath(r.URL.Path)
+	id, err := getTodoIDFromRequest(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid todo ID")
 		return

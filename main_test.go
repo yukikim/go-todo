@@ -17,7 +17,7 @@ func TestCreateTodoHandler(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/todos", body)
 	rec := httptest.NewRecorder()
 
-	todosHandler(rec, req)
+	newRouter().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("expected status %d, got %d", http.StatusCreated, rec.Code)
@@ -57,7 +57,7 @@ func TestGetTodoHandler(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/todos/1", nil)
 	rec := httptest.NewRecorder()
 
-	todoHandler(rec, req)
+	newRouter().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
@@ -79,7 +79,7 @@ func TestGetTodoHandlerNotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/todos/999", nil)
 	rec := httptest.NewRecorder()
 
-	todoHandler(rec, req)
+	newRouter().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
@@ -113,7 +113,7 @@ func TestUpdateTodoHandler(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/todos/1", body)
 	rec := httptest.NewRecorder()
 
-	todoHandler(rec, req)
+	newRouter().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
@@ -144,7 +144,7 @@ func TestUpdateTodoHandlerNotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/todos/999", body)
 	rec := httptest.NewRecorder()
 
-	todoHandler(rec, req)
+	newRouter().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
@@ -168,7 +168,7 @@ func TestDeleteTodoHandler(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/todos/1", nil)
 	rec := httptest.NewRecorder()
 
-	todoHandler(rec, req)
+	newRouter().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected status %d, got %d", http.StatusNoContent, rec.Code)
@@ -185,7 +185,7 @@ func TestDeleteTodoHandlerNotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/todos/999", nil)
 	rec := httptest.NewRecorder()
 
-	todoHandler(rec, req)
+	newRouter().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
@@ -209,7 +209,7 @@ func TestCompleteTodoHandler(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPatch, "/todos/1/complete", nil)
 	rec := httptest.NewRecorder()
 
-	todoHandler(rec, req)
+	newRouter().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
@@ -246,7 +246,7 @@ func TestCompleteTodoHandlerTogglesBackToIncomplete(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPatch, "/todos/1/complete", nil)
 	rec := httptest.NewRecorder()
 
-	todoHandler(rec, req)
+	newRouter().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
@@ -263,7 +263,7 @@ func TestCompleteTodoHandlerNotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPatch, "/todos/999/complete", nil)
 	rec := httptest.NewRecorder()
 
-	todoHandler(rec, req)
+	newRouter().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
