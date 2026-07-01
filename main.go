@@ -20,7 +20,7 @@ func main() {
 
 	// PostgreSQLとやり取りするStoreを作成し、TodoStore interfaceとして保持する
 	todoStore = NewPostgresStore(db)
-	// StoreをServiceに渡し、handlerからはService経由でTodoの処理を呼び出す
+	// StoreをServiceに渡し、handler(./handler.go > todoService.<store.go > interface>)からはService経由(./service.go > NewTodoService関数にtodoStoreを渡す)でTodoの処理を呼び出す
 	todoService = NewTodoService(todoStore)
 
 	fmt.Println("server started at http://localhost:8080")
