@@ -180,3 +180,88 @@ go run .
 curl http://localhost:8080/health
 curl http://localhost:8080/todos
 ```
+
+---
+
+## chi を使ったルーティング
+
+現在の実装では、標準ライブラリの `http.HandleFunc` ではなく、`chi` を使ってルーティングしています。
+
+chi は Go 製の軽量な HTTP ルーターです。Gin のような大きめの Web フレームワークというより、標準ライブラリの `net/http` に近い感覚で使えるルーティングライブラリです。
+
+### 導入パッケージ
+
+```bash
+go get github.com/go-chi/chi/v5
+```
+
+### ルーティング例
+
+```go
+r.Get("/todos", getTodosHandler)
+r.Post("/todos", createTodoHandler)
+r.Get("/todos/{id}", getTodoHandler)
+r.Put("/todos/{id}", updateTodoHandler)
+r.Delete("/todos/{id}", deleteTodoHandler)
+r.Patch("/todos/{id}/complete", completeTodoHandler)
+```
+
+標準ライブラリだけで書く場合は、`/todos` と `/todos/` を分けて登録したり、handler の中で `switch r.Method` を使って HTTP メソッドを判定したりする必要がありました。
+
+chi を使うと、HTTP メソッドとパスをルーティング定義側で分けられるため、handler は「その処理だけ」に集中しやすくなります。
+
+### メリット
+
+- 標準ライブラリに近い書き方で導入しやすい
+- `http.Handler` / `http.HandlerFunc` と相性が良い
+- `/todos/{id}` のようなパスパラメータを扱いやすい
+- HTTP メソッドごとに route を分けられる
+- 存在しないルートや許可していないメソッドの処理をまとめて定義できる
+- middleware を追加しやすい
+- フレームワーク色が強すぎず、既存の `net/http` の知識を活かしやすい
+
+### 今回の実装で変わった点
+
+ID の取得は、文字列操作ではなく `chi.URLParam` を使います。
+
+```go
+idText := chi.URLParam(r, "id")
+```
+
+以前は、以下のように URL パス文字列を手動で処理していました。
+
+```go
+idText := strings.TrimPrefix(path, "/todos/")
+```
+
+chi 導入後は、`/todos/{id}` の `{id}` 部分をルーターが解釈してくれるため、handler 側の処理がシンプルになります。
+
+ルーターは `newRouter()` にまとめています。
+
+```go
+func newRouter() http.Handler {
+	r := chi.NewRouter()
+
+	r.Get("/todos", getTodosHandler)
+	r.Post("/todos", createTodoHandler)
+	r.Get("/todos/{id}", getTodoHandler)
+
+	return r
+}
+```
+
+`main.go` では、この router を `http.ListenAndServe` に渡します。
+
+```go
+http.ListenAndServe(":8080", newRouter())
+```
+
+### 注意点
+
+- 標準ライブラリだけの実装より依存パッケージが増える
+- `chi.URLParam` は chi の router を通ったリクエストで使う
+- テストでは handler を直接呼ぶより、router 経由でリクエストする方が自然
+- Gin のように JSON bind や response helper が大きく用意されているわけではない
+- 小さな API では標準ライブラリだけでも十分な場合がある
+
+chi は「標準ライブラリの考え方を保ちながら、ルーティングだけを便利にしたい」場合に使いやすい選択肢です。
