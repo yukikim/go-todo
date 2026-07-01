@@ -29,8 +29,8 @@ func createTodoHandler(c *gin.Context) {
 	}
 
 	todo, err := todoService.CreateTodo(c.Request.Context(), req)
-	if errors.Is(err, errTitleRequired) {
-		writeError(c, http.StatusBadRequest, "title is required")
+	if isValidationError(err) {
+		writeError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	if err != nil {
@@ -82,8 +82,8 @@ func updateTodoHandler(c *gin.Context) {
 	}
 
 	todo, err := todoService.UpdateTodo(c.Request.Context(), id, req)
-	if errors.Is(err, errTitleRequired) {
-		writeError(c, http.StatusBadRequest, "title is required")
+	if isValidationError(err) {
+		writeError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	if errors.Is(err, errTodoNotFound) {
@@ -96,6 +96,12 @@ func updateTodoHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, todo)
+}
+
+func isValidationError(err error) bool {
+	return errors.Is(err, errTitleRequired) ||
+		errors.Is(err, errTitleTooLong) ||
+		errors.Is(err, errDescriptionTooLong)
 }
 
 func deleteTodoHandler(c *gin.Context) {

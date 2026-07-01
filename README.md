@@ -209,6 +209,34 @@ func (s *TodoService) CreateTodo(ctx context.Context, req CreateTodoRequest) (To
 }
 ```
 
+### バリデーション
+
+現在の実装では、`service.go` で Todo 作成・更新時の入力値をチェックしています。
+
+- `title` は前後の空白を取り除いたうえで必須
+- `title` は100文字以内
+- `description` は前後の空白を取り除く
+- `description` は500文字以内
+
+handler は JSON の読み取りとレスポンスを担当し、入力値のルールは service に集めています。
+
+```go
+func validateCreateTodoRequest(req CreateTodoRequest) (CreateTodoRequest, error) {
+	req.Title = strings.TrimSpace(req.Title)
+	req.Description = strings.TrimSpace(req.Description)
+
+	if req.Title == "" {
+		return CreateTodoRequest{}, errTitleRequired
+	}
+
+	if len([]rune(req.Title)) > maxTitleLength {
+		return CreateTodoRequest{}, errTitleTooLong
+	}
+
+	return req, nil
+}
+```
+
 ### store 層
 
 `store.go` と `postgres_store.go` が store 層です。

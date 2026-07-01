@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -39,6 +40,85 @@ func TestCreateTodoHandler(t *testing.T) {
 
 	if _, ok := store.todos[todo.ID]; !ok {
 		t.Fatalf("expected todo to be saved")
+	}
+}
+
+func TestCreateTodoHandlerTrimsInput(t *testing.T) {
+	store := newMemoryTodoStore(nil, 1)
+	todoStore = store
+	todoService = NewTodoService(store)
+
+	body := bytes.NewBufferString(`{"title":"  Goを学習する  ","description":"  空白を取り除く  "}`)
+	req := httptest.NewRequest(http.MethodPost, "/todos", body)
+	rec := httptest.NewRecorder()
+
+	newRouter().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d", http.StatusCreated, rec.Code)
+	}
+
+	var todo Todo
+	if err := json.NewDecoder(rec.Body).Decode(&todo); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if todo.Title != "Goを学習する" {
+		t.Fatalf("expected title %q, got %q", "Goを学習する", todo.Title)
+	}
+
+	if todo.Description != "空白を取り除く" {
+		t.Fatalf("expected description %q, got %q", "空白を取り除く", todo.Description)
+	}
+}
+
+func TestCreateTodoHandlerValidationError(t *testing.T) {
+	store := newMemoryTodoStore(nil, 1)
+	todoStore = store
+	todoService = NewTodoService(store)
+
+	body := bytes.NewBufferString(`{"title":"   ","description":"titleが空です"}`)
+	req := httptest.NewRequest(http.MethodPost, "/todos", body)
+	rec := httptest.NewRecorder()
+
+	newRouter().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+
+	var errorResponse ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&errorResponse); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errorResponse.Error != "title is required" {
+		t.Fatalf("expected error %q, got %q", "title is required", errorResponse.Error)
+	}
+}
+
+func TestCreateTodoHandlerTitleTooLong(t *testing.T) {
+	store := newMemoryTodoStore(nil, 1)
+	todoStore = store
+	todoService = NewTodoService(store)
+
+	body := bytes.NewBufferString(`{"title":"` + strings.Repeat("a", maxTitleLength+1) + `","description":"titleが長すぎます"}`)
+	req := httptest.NewRequest(http.MethodPost, "/todos", body)
+	rec := httptest.NewRecorder()
+
+	newRouter().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+
+	var errorResponse ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&errorResponse); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errorResponse.Error != "title must be 100 characters or less" {
+		t.Fatalf("expected error %q, got %q", "title must be 100 characters or less", errorResponse.Error)
 	}
 }
 
@@ -140,6 +220,41 @@ func TestUpdateTodoHandler(t *testing.T) {
 
 	if store.todos[1].Description != "新しい説明" {
 		t.Fatalf("expected todo in map to be updated")
+	}
+}
+
+func TestUpdateTodoHandlerDescriptionTooLong(t *testing.T) {
+	now := time.Now()
+	store := newMemoryTodoStore(map[int]Todo{
+		1: {
+			ID:          1,
+			Title:       "古いタイトル",
+			Description: "古い説明",
+			Completed:   false,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+	}, 2)
+	todoStore = store
+	todoService = NewTodoService(store)
+
+	body := bytes.NewBufferString(`{"title":"新しいタイトル","description":"` + strings.Repeat("a", maxDescriptionLength+1) + `","completed":true}`)
+	req := httptest.NewRequest(http.MethodPut, "/todos/1", body)
+	rec := httptest.NewRecorder()
+
+	newRouter().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+
+	var errorResponse ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&errorResponse); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errorResponse.Error != "description must be 500 characters or less" {
+		t.Fatalf("expected error %q, got %q", "description must be 500 characters or less", errorResponse.Error)
 	}
 }
 
