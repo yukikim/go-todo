@@ -19,6 +19,7 @@ func main() {
 	}
 	defer db.Close()
 
+	// TodoStoreのインスタンスをPostgresStoreで初期化する(./postgres_store.goで定義)
 	todoStore = NewPostgresStore(db)
 
 	fmt.Println("server started at http://localhost:8080")
