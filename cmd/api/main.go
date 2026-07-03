@@ -25,9 +25,22 @@ func main() {
 
 	todoRepository := repository.NewPostgresRepository(database)
 	todoService := service.NewTodoService(todoRepository)
+	authService := service.NewAuthService(
+		getEnv("AUTH_USERNAME", "admin"),
+		getEnv("AUTH_PASSWORD", "password"),
+		getEnv("JWT_SECRET", "go-todo-dev-secret"),
+	)
 
 	fmt.Println("server started at http://localhost:8080")
-	if err := handler.NewRouter(todoService).Run(":8080"); err != nil {
+	if err := handler.NewRouter(todoService, authService).Run(":8080"); err != nil {
 		fmt.Println("server error:", err)
 	}
+}
+
+func getEnv(key, fallback string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	return value
 }

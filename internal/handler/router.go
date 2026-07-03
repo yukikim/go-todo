@@ -8,8 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewRouter(todoService *service.TodoService) *gin.Engine {
+func NewRouter(todoService *service.TodoService, authService *service.AuthService) *gin.Engine {
 	todoHandler := NewTodoHandler(todoService)
+	authHandler := NewAuthHandler(authService)
 	r := gin.Default()
 
 	r.NoRoute(func(c *gin.Context) {
@@ -23,12 +24,16 @@ func NewRouter(todoService *service.TodoService) *gin.Engine {
 		c.String(http.StatusOK, "OK\n")
 	})
 
-	r.GET("/todos", todoHandler.GetTodos)
-	r.POST("/todos", todoHandler.CreateTodo)
-	r.GET("/todos/:id", todoHandler.GetTodo)
-	r.PUT("/todos/:id", todoHandler.UpdateTodo)
-	r.DELETE("/todos/:id", todoHandler.DeleteTodo)
-	r.PATCH("/todos/:id/complete", todoHandler.CompleteTodo)
+	r.POST("/login", authHandler.Login)
+
+	todos := r.Group("/todos")
+	todos.Use(AuthMiddleware(authService))
+	todos.GET("", todoHandler.GetTodos)
+	todos.POST("", todoHandler.CreateTodo)
+	todos.GET("/:id", todoHandler.GetTodo)
+	todos.PUT("/:id", todoHandler.UpdateTodo)
+	todos.DELETE("/:id", todoHandler.DeleteTodo)
+	todos.PATCH("/:id/complete", todoHandler.CompleteTodo)
 
 	return r
 }

@@ -5,6 +5,9 @@ services:
     container_name: go-todo-api
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/go_todo?sslmode=disable
+      AUTH_USERNAME: admin
+      AUTH_PASSWORD: password
+      JWT_SECRET: go-todo-dev-secret
     ports:
       - "8080:8080"
     depends_on:

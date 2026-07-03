@@ -296,8 +296,94 @@ func TestDeleteTodoHandlerNotFound(t *testing.T) {
 	}
 }
 
+func TestLoginHandlerReturnsToken(t *testing.T) {
+	store := newMemoryTodoStore(nil, 1)
+	body := bytes.NewBufferString(`{"username":"admin","password":"password"}`)
+	req := httptest.NewRequest(http.MethodPost, "/login", body)
+	rec := httptest.NewRecorder()
+
+	newRawTestRouter(store).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	var response model.LoginResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if response.Token == "" {
+		t.Fatalf("expected token to be returned")
+	}
+}
+
+func TestLoginHandlerInvalidCredentials(t *testing.T) {
+	store := newMemoryTodoStore(nil, 1)
+	body := bytes.NewBufferString(`{"username":"admin","password":"wrong"}`)
+	req := httptest.NewRequest(http.MethodPost, "/login", body)
+	rec := httptest.NewRecorder()
+
+	newRawTestRouter(store).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+	}
+}
+
+func TestTodoRoutesRequireAuthorization(t *testing.T) {
+	store := newMemoryTodoStore(nil, 1)
+	req := httptest.NewRequest(http.MethodGet, "/todos", nil)
+	rec := httptest.NewRecorder()
+
+	newRawTestRouter(store).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+	}
+
+	var errorResponse handler.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&errorResponse); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errorResponse.Error != "authorization header is required" {
+		t.Fatalf("expected error %q, got %q", "authorization header is required", errorResponse.Error)
+	}
+}
+
+func TestTodoRoutesRejectInvalidToken(t *testing.T) {
+	store := newMemoryTodoStore(nil, 1)
+	req := httptest.NewRequest(http.MethodGet, "/todos", nil)
+	req.Header.Set("Authorization", "Bearer invalid-token")
+	rec := httptest.NewRecorder()
+
+	newRawTestRouter(store).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+	}
+}
+
 func newTestRouter(store *memoryTodoStore) http.Handler {
-	return handler.NewRouter(service.NewTodoService(store))
+	router := newRawTestRouter(store)
+	token, err := newTestAuthService().GenerateToken("admin")
+	if err != nil {
+		panic(err)
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, r)
+	})
+}
+
+func newRawTestRouter(store *memoryTodoStore) http.Handler {
+	return handler.NewRouter(service.NewTodoService(store), newTestAuthService())
+}
+
+func newTestAuthService() *service.AuthService {
+	return service.NewAuthService("admin", "password", "test-secret")
 }
 
 func TestCompleteTodoHandler(t *testing.T) {

@@ -395,7 +395,95 @@ go run ./cmd/api
 #### 確認コマンド
 ```bash
 curl http://localhost:8080/health
-curl http://localhost:8080/todos
+curl -X POST http://localhost:8080/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"password"}'
+```
+
+---
+
+## JWT 認証を追加する
+
+現在の実装では、Todo API を呼び出す前に `POST /login` で JWT を取得します。
+
+`/health` と `/login` は認証なしで呼び出せます。`/todos` 以下の API は、`Authorization: Bearer <token>` ヘッダーが必要です。
+
+### 認証用の環境変数
+
+未指定の場合は、学習用のデフォルト値を使います。
+
+```bash
+AUTH_USERNAME=admin
+AUTH_PASSWORD=password
+JWT_SECRET=go-todo-dev-secret
+```
+
+別の値を使う場合は、サーバー起動前に指定してください。
+
+```bash
+export AUTH_USERNAME="admin"
+export AUTH_PASSWORD="password"
+export JWT_SECRET="your-secret"
+```
+
+### ログイン
+
+```bash
+curl -X POST http://localhost:8080/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"password"}'
+```
+
+成功すると、次のように `token` が返ります。
+
+```json
+{
+  "token": "..."
+}
+```
+
+### Todo API を呼び出す
+
+取得した token を `Authorization` ヘッダーに入れて呼び出します。
+
+```bash
+TOKEN="ログインで返ったtoken"
+
+curl http://localhost:8080/todos \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
+Todo を登録する場合も同じです。
+
+```bash
+curl -X POST http://localhost:8080/todos \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -d '{"title":"JWT認証を使う","description":"Bearer token付きでTodoを作成する"}'
+```
+
+### 実装の流れ
+
+```txt
+POST /login
+  ↓
+AuthHandler
+  ↓
+AuthService
+  ↓
+JWT を発行
+```
+
+Todo API のリクエストでは、handler の前に middleware が動きます。
+
+```txt
+Authorization header
+  ↓
+AuthMiddleware
+  ↓
+JWT を検証
+  ↓
+TodoHandler
 ```
 
 ---
@@ -432,14 +520,19 @@ docker compose up --build -d
 
 ```bash
 curl http://localhost:8080/health
-curl http://localhost:8080/todos
+curl -X POST http://localhost:8080/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"password"}'
 ```
 
 Todo を登録する場合は以下です。
 
 ```bash
+TOKEN="ログインで返ったtoken"
+
 curl -X POST http://localhost:8080/todos \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${TOKEN}" \
   -d '{"title":"Dockerで起動する","description":"APIとPostgreSQLをcomposeで起動する"}'
 ```
 
