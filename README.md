@@ -400,6 +400,79 @@ curl http://localhost:8080/todos
 
 ---
 
+## Docker 化する
+
+現在の実装では、Go API と PostgreSQL を Docker Compose でまとめて起動できます。
+
+### 構成
+
+```txt
+api
+  Go API コンテナ
+
+postgres
+  PostgreSQL コンテナ
+```
+
+`api` コンテナは `Dockerfile` から build します。`postgres` コンテナは `postgres:17-alpine` イメージを使います。
+
+### 起動
+
+```bash
+docker compose up --build
+```
+
+バックグラウンドで起動する場合は以下です。
+
+```bash
+docker compose up --build -d
+```
+
+### 確認
+
+```bash
+curl http://localhost:8080/health
+curl http://localhost:8080/todos
+```
+
+Todo を登録する場合は以下です。
+
+```bash
+curl -X POST http://localhost:8080/todos \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Dockerで起動する","description":"APIとPostgreSQLをcomposeで起動する"}'
+```
+
+### 停止
+
+```bash
+docker compose down
+```
+
+DB のデータも削除したい場合は、volume も削除します。
+
+```bash
+docker compose down -v
+```
+
+### Docker 内の接続先
+
+ローカルで `go run ./cmd/api` する場合、PostgreSQL の接続先は `localhost` です。
+
+```bash
+postgres://postgres:postgres@localhost:5432/go_todo?sslmode=disable
+```
+
+Docker Compose 内で API コンテナから PostgreSQL コンテナへ接続する場合、ホスト名は service 名の `postgres` になります。
+
+```bash
+postgres://postgres:postgres@postgres:5432/go_todo?sslmode=disable
+```
+
+この値は `docker-compose.yml` の `api.environment.DATABASE_URL` に設定しています。
+
+---
+
 ## Gin を使ったルーティング
 
 現在の実装では、標準ライブラリの `http.HandleFunc` ではなく、`Gin` を使ってルーティングしています。

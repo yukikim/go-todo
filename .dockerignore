@@ -1,0 +1,10 @@
+.git
+.gocache
+tmp
+bin
+.env
+*.test
+*.out
+coverage.*
+Dockerfile
+docker-compose.yml
