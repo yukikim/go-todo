@@ -1,4 +1,4 @@
-package main
+package model
 
 import (
 	"errors"
@@ -25,4 +25,4 @@ type UpdateTodoRequest struct {
 	Completed   bool   `json:"completed"`
 }
 
-var errTodoNotFound = errors.New("todo not found")
+var ErrTodoNotFound = errors.New("todo not found")

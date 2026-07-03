@@ -129,25 +129,34 @@ curl -X PATCH http://localhost:8080/todos/1/complete
 
 ---
 
-ファイル分割しました。動作は変えずに、役割ごとに整理しています。
+ファイル分割しました。動作は変えずに、`go-todo2` と同じように `cmd/api` と `internal` 配下へ役割ごとに整理しています。
 
-- [main.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/main.go:1)
-サーバー起動とルーティング登録だけ
+- [cmd/api/main.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/cmd/api/main.go:1)
+サーバー起動、DB 接続、各レイヤーの組み立て
 
-- [models.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/models.go:1)
+- [internal/model/todo.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/internal/model/todo.go:1)
 Todo, request 用 struct
 
-- [handlers.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/handlers.go:1)
+- [internal/handler/todo_handler.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/internal/handler/todo_handler.go:1)
 GET / POST / PUT / DELETE / PATCH の handler 本体
 
-- [response.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/response.go:1)
-writeJSON, writeError, ErrorResponse
+- [internal/handler/router.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/internal/handler/router.go:1)
+Gin のルーティング登録
+
+- [internal/service/todo_service.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/internal/service/todo_service.go:1)
+Todo の入力チェックと処理ルール
+
+- [internal/repository/todo_repository.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/internal/repository/todo_repository.go:1)
+PostgreSQL への保存・取得・更新・削除
+
+- [internal/db/db.go (line 1)](/Users/greenpowermarco/personal_files/my_app/go-practice/go-todo/internal/db/db.go:1)
+PostgreSQL 接続とテーブル作成
 
 ---
 
 ## レイヤー分割
 
-現在の実装では、処理を `handler` / `service` / `store` に分けています。
+現在の実装では、処理を `handler` / `service` / `repository` / `model` / `db` に分けています。
 
 ```txt
 HTTP request
@@ -156,14 +165,14 @@ handler
   ↓
 service
   ↓
-store
+repository
   ↓
 PostgreSQL
 ```
 
 ### handler 層
 
-`handlers.go` が handler 層です。
+`internal/handler` が handler 層です。
 
 handler は、HTTP リクエストとレスポンスを扱います。
 
@@ -175,43 +184,43 @@ handler は、HTTP リクエストとレスポンスを扱います。
 Gin を使っているため、handler は `*gin.Context` を受け取ります。
 
 ```go
-func getTodoHandler(c *gin.Context) {
+func (h *TodoHandler) GetTodo(c *gin.Context) {
 	id, err := getTodoIDFromContext(c)
 	if err != nil {
 		writeError(c, http.StatusBadRequest, "invalid todo ID")
 		return
 	}
 
-	todo, err := todoService.GetTodo(c.Request.Context(), id)
+	todo, err := h.service.GetTodo(c.Request.Context(), id)
 	// ...
 }
 ```
 
 ### service 層
 
-`service.go` が service 層です。
+`internal/service` が service 層です。
 
 service は、Todo API の処理ルールを担当します。
 
 - Todo を作成する前に title を確認する
 - Todo を更新する前に title を確認する
-- store を呼び出して保存・取得・更新・削除する
+- repository を呼び出して保存・取得・更新・削除する
 
 例えば、`title` が空かどうかの確認は handler ではなく service 側で行います。
 
 ```go
-func (s *TodoService) CreateTodo(ctx context.Context, req CreateTodoRequest) (Todo, error) {
+func (s *TodoService) CreateTodo(ctx context.Context, req model.CreateTodoRequest) (model.Todo, error) {
 	if req.Title == "" {
-		return Todo{}, errTitleRequired
+		return model.Todo{}, ErrTitleRequired
 	}
 
-	return s.store.CreateTodo(ctx, req)
+	return s.repository.CreateTodo(ctx, req)
 }
 ```
 
 ### バリデーション
 
-現在の実装では、`service.go` で Todo 作成・更新時の入力値をチェックしています。
+現在の実装では、`internal/service/todo_service.go` で Todo 作成・更新時の入力値をチェックしています。
 
 - `title` は前後の空白を取り除いたうえで必須
 - `title` は100文字以内
@@ -221,52 +230,52 @@ func (s *TodoService) CreateTodo(ctx context.Context, req CreateTodoRequest) (To
 handler は JSON の読み取りとレスポンスを担当し、入力値のルールは service に集めています。
 
 ```go
-func validateCreateTodoRequest(req CreateTodoRequest) (CreateTodoRequest, error) {
+func validateCreateTodoRequest(req model.CreateTodoRequest) (model.CreateTodoRequest, error) {
 	req.Title = strings.TrimSpace(req.Title)
 	req.Description = strings.TrimSpace(req.Description)
 
 	if req.Title == "" {
-		return CreateTodoRequest{}, errTitleRequired
+		return model.CreateTodoRequest{}, ErrTitleRequired
 	}
 
-	if len([]rune(req.Title)) > maxTitleLength {
-		return CreateTodoRequest{}, errTitleTooLong
+	if len([]rune(req.Title)) > MaxTitleLength {
+		return model.CreateTodoRequest{}, ErrTitleTooLong
 	}
 
 	return req, nil
 }
 ```
 
-### store 層
+### repository 層
 
-`store.go` と `postgres_store.go` が store 層です。
+`internal/repository/todo_repository.go` が repository 層です。
 
-store は、データの保存先とのやり取りを担当します。
+repository は、データの保存先とのやり取りを担当します。
 
 - PostgreSQL から Todo 一覧を取得する
 - PostgreSQL に Todo を登録する
 - PostgreSQL の Todo を更新・削除する
 
-`store.go` では、保存処理に必要なメソッドを `TodoStore` interface として定義しています。
+保存処理に必要なメソッドを `TodoRepository` interface として定義しています。
 
 ```go
-type TodoStore interface {
-	ListTodos(ctx context.Context) ([]Todo, error)
-	CreateTodo(ctx context.Context, req CreateTodoRequest) (Todo, error)
-	GetTodo(ctx context.Context, id int) (Todo, error)
-	UpdateTodo(ctx context.Context, id int, req UpdateTodoRequest) (Todo, error)
+type TodoRepository interface {
+	ListTodos(ctx context.Context) ([]model.Todo, error)
+	CreateTodo(ctx context.Context, req model.CreateTodoRequest) (model.Todo, error)
+	GetTodo(ctx context.Context, id int) (model.Todo, error)
+	UpdateTodo(ctx context.Context, id int, req model.UpdateTodoRequest) (model.Todo, error)
 	DeleteTodo(ctx context.Context, id int) error
-	ToggleTodoComplete(ctx context.Context, id int) (Todo, error)
+	ToggleTodoComplete(ctx context.Context, id int) (model.Todo, error)
 }
 ```
 
-実際の PostgreSQL 処理は `postgres_store.go` にあります。
+実際の PostgreSQL 処理は `PostgresRepository` にあります。
 
 ### レイヤー分割のメリット
 
 - handler が HTTP の処理に集中できる
 - service に処理ルールを集められる
-- store を差し替えやすくなる
+- repository を差し替えやすくなる
 - テストで PostgreSQL ではなくメモリ実装を使いやすい
 - コードの責務が分かりやすくなる
 
@@ -301,7 +310,7 @@ export DATABASE_URL="postgres://postgres:postgres@localhost:5432/go_todo?sslmode
 #### 起動コマンド
 
 ```bash
-go run .
+go run ./cmd/api
 ```
 
 #### 確認コマンド
@@ -327,12 +336,12 @@ go get github.com/gin-gonic/gin
 ### ルーティング例
 
 ```go
-r.GET("/todos", getTodosHandler)
-r.POST("/todos", createTodoHandler)
-r.GET("/todos/:id", getTodoHandler)
-r.PUT("/todos/:id", updateTodoHandler)
-r.DELETE("/todos/:id", deleteTodoHandler)
-r.PATCH("/todos/:id/complete", completeTodoHandler)
+r.GET("/todos", todoHandler.GetTodos)
+r.POST("/todos", todoHandler.CreateTodo)
+r.GET("/todos/:id", todoHandler.GetTodo)
+r.PUT("/todos/:id", todoHandler.UpdateTodo)
+r.DELETE("/todos/:id", todoHandler.DeleteTodo)
+r.PATCH("/todos/:id/complete", todoHandler.CompleteTodo)
 ```
 
 標準ライブラリだけで書く場合は、`/todos` と `/todos/` を分けて登録したり、handler の中で `switch r.Method` を使って HTTP メソッドを判定したりする必要がありました。
@@ -359,7 +368,7 @@ idText := c.Param("id")
 JSON リクエストの読み取りは、`json.NewDecoder` ではなく `ShouldBindJSON` を使います。
 
 ```go
-var req CreateTodoRequest
+var req model.CreateTodoRequest
 if err := c.ShouldBindJSON(&req); err != nil {
 	writeError(c, http.StatusBadRequest, "invalid JSON")
 	return

@@ -1,15 +1,26 @@
-package main
+package handler
 
 import (
 	"errors"
 	"net/http"
 	"strconv"
 
+	"go-todo/internal/model"
+	"go-todo/internal/service"
+
 	"github.com/gin-gonic/gin"
 )
 
-func getTodosHandler(c *gin.Context) {
-	todos, err := todoService.ListTodos(c.Request.Context())
+type TodoHandler struct {
+	service *service.TodoService
+}
+
+func NewTodoHandler(service *service.TodoService) *TodoHandler {
+	return &TodoHandler{service: service}
+}
+
+func (h *TodoHandler) GetTodos(c *gin.Context) {
+	todos, err := h.service.ListTodos(c.Request.Context())
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "failed to list todos")
 		return
@@ -18,18 +29,15 @@ func getTodosHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, todos)
 }
 
-func createTodoHandler(c *gin.Context) {
-	// リクエストのJSONを格納するための構造体を作成(CreateTodoRequestはTypescriptのinterfaceのようなもの)
-	var req CreateTodoRequest
-	// ShouldBindJSONでリクエストボディをデコードし、reqに格納する
+func (h *TodoHandler) CreateTodo(c *gin.Context) {
+	var req model.CreateTodoRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		// JSONのデコードに失敗した場合、HTTPステータスコード400(Bad Request)を返す
 		writeError(c, http.StatusBadRequest, "invalid JSON")
 		return
 	}
 
-	todo, err := todoService.CreateTodo(c.Request.Context(), req)
-	if isValidationError(err) {
+	todo, err := h.service.CreateTodo(c.Request.Context(), req)
+	if service.IsValidationError(err) {
 		writeError(c, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -38,19 +46,18 @@ func createTodoHandler(c *gin.Context) {
 		return
 	}
 
-	// 作成したTodoをJSON形式でレスポンスとして返す
 	c.JSON(http.StatusCreated, todo)
 }
 
-func getTodoHandler(c *gin.Context) {
+func (h *TodoHandler) GetTodo(c *gin.Context) {
 	id, err := getTodoIDFromContext(c)
 	if err != nil {
 		writeError(c, http.StatusBadRequest, "invalid todo ID")
 		return
 	}
 
-	todo, err := todoService.GetTodo(c.Request.Context(), id)
-	if errors.Is(err, errTodoNotFound) {
+	todo, err := h.service.GetTodo(c.Request.Context(), id)
+	if errors.Is(err, model.ErrTodoNotFound) {
 		writeError(c, http.StatusNotFound, "todo not found")
 		return
 	}
@@ -62,31 +69,25 @@ func getTodoHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, todo)
 }
 
-func getTodoIDFromContext(c *gin.Context) (int, error) {
-	// *gin.Context.Param() は、URLパラメータを取得するためのメソッドです。例えば、URLが /todos/123 の場合、c.Param("id") は "123" を返します。
-	idText := c.Param("id")
-	return strconv.Atoi(idText)
-}
-
-func updateTodoHandler(c *gin.Context) {
+func (h *TodoHandler) UpdateTodo(c *gin.Context) {
 	id, err := getTodoIDFromContext(c)
 	if err != nil {
 		writeError(c, http.StatusBadRequest, "invalid todo ID")
 		return
 	}
 
-	var req UpdateTodoRequest
+	var req model.UpdateTodoRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		writeError(c, http.StatusBadRequest, "invalid JSON")
 		return
 	}
 
-	todo, err := todoService.UpdateTodo(c.Request.Context(), id, req)
-	if isValidationError(err) {
+	todo, err := h.service.UpdateTodo(c.Request.Context(), id, req)
+	if service.IsValidationError(err) {
 		writeError(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if errors.Is(err, errTodoNotFound) {
+	if errors.Is(err, model.ErrTodoNotFound) {
 		writeError(c, http.StatusNotFound, "todo not found")
 		return
 	}
@@ -98,21 +99,15 @@ func updateTodoHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, todo)
 }
 
-func isValidationError(err error) bool {
-	return errors.Is(err, errTitleRequired) ||
-		errors.Is(err, errTitleTooLong) ||
-		errors.Is(err, errDescriptionTooLong)
-}
-
-func deleteTodoHandler(c *gin.Context) {
+func (h *TodoHandler) DeleteTodo(c *gin.Context) {
 	id, err := getTodoIDFromContext(c)
 	if err != nil {
 		writeError(c, http.StatusBadRequest, "invalid todo ID")
 		return
 	}
 
-	err = todoService.DeleteTodo(c.Request.Context(), id)
-	if errors.Is(err, errTodoNotFound) {
+	err = h.service.DeleteTodo(c.Request.Context(), id)
+	if errors.Is(err, model.ErrTodoNotFound) {
 		writeError(c, http.StatusNotFound, "todo not found")
 		return
 	}
@@ -124,15 +119,15 @@ func deleteTodoHandler(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func completeTodoHandler(c *gin.Context) {
+func (h *TodoHandler) CompleteTodo(c *gin.Context) {
 	id, err := getTodoIDFromContext(c)
 	if err != nil {
 		writeError(c, http.StatusBadRequest, "invalid todo ID")
 		return
 	}
 
-	todo, err := todoService.ToggleTodoComplete(c.Request.Context(), id)
-	if errors.Is(err, errTodoNotFound) {
+	todo, err := h.service.ToggleTodoComplete(c.Request.Context(), id)
+	if errors.Is(err, model.ErrTodoNotFound) {
 		writeError(c, http.StatusNotFound, "todo not found")
 		return
 	}
@@ -142,4 +137,9 @@ func completeTodoHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, todo)
+}
+
+func getTodoIDFromContext(c *gin.Context) (int, error) {
+	idText := c.Param("id")
+	return strconv.Atoi(idText)
 }

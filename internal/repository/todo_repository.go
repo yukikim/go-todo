@@ -1,21 +1,32 @@
-package main
+package repository
 
 import (
 	"context"
 	"database/sql"
 	"errors"
+
+	"go-todo/internal/model"
 )
 
-type PostgresStore struct {
+type TodoRepository interface {
+	ListTodos(ctx context.Context) ([]model.Todo, error)
+	CreateTodo(ctx context.Context, req model.CreateTodoRequest) (model.Todo, error)
+	GetTodo(ctx context.Context, id int) (model.Todo, error)
+	UpdateTodo(ctx context.Context, id int, req model.UpdateTodoRequest) (model.Todo, error)
+	DeleteTodo(ctx context.Context, id int) error
+	ToggleTodoComplete(ctx context.Context, id int) (model.Todo, error)
+}
+
+type PostgresRepository struct {
 	db *sql.DB
 }
 
-func NewPostgresStore(db *sql.DB) *PostgresStore {
-	return &PostgresStore{db: db}
+func NewPostgresRepository(db *sql.DB) *PostgresRepository {
+	return &PostgresRepository{db: db}
 }
 
-func (s *PostgresStore) ListTodos(ctx context.Context) ([]Todo, error) {
-	rows, err := s.db.QueryContext(ctx, `
+func (r *PostgresRepository) ListTodos(ctx context.Context) ([]model.Todo, error) {
+	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, title, description, completed, created_at, updated_at
 		FROM todos
 		ORDER BY id
@@ -25,9 +36,9 @@ func (s *PostgresStore) ListTodos(ctx context.Context) ([]Todo, error) {
 	}
 	defer rows.Close()
 
-	todos := []Todo{}
+	todos := []model.Todo{}
 	for rows.Next() {
-		var todo Todo
+		var todo model.Todo
 		if err := rows.Scan(
 			&todo.ID,
 			&todo.Title,
@@ -48,9 +59,9 @@ func (s *PostgresStore) ListTodos(ctx context.Context) ([]Todo, error) {
 	return todos, nil
 }
 
-func (s *PostgresStore) CreateTodo(ctx context.Context, req CreateTodoRequest) (Todo, error) {
-	var todo Todo
-	err := s.db.QueryRowContext(ctx, `
+func (r *PostgresRepository) CreateTodo(ctx context.Context, req model.CreateTodoRequest) (model.Todo, error) {
+	var todo model.Todo
+	err := r.db.QueryRowContext(ctx, `
 		INSERT INTO todos (title, description)
 		VALUES ($1, $2)
 		RETURNING id, title, description, completed, created_at, updated_at
@@ -65,9 +76,9 @@ func (s *PostgresStore) CreateTodo(ctx context.Context, req CreateTodoRequest) (
 	return todo, err
 }
 
-func (s *PostgresStore) GetTodo(ctx context.Context, id int) (Todo, error) {
-	var todo Todo
-	err := s.db.QueryRowContext(ctx, `
+func (r *PostgresRepository) GetTodo(ctx context.Context, id int) (model.Todo, error) {
+	var todo model.Todo
+	err := r.db.QueryRowContext(ctx, `
 		SELECT id, title, description, completed, created_at, updated_at
 		FROM todos
 		WHERE id = $1
@@ -80,14 +91,14 @@ func (s *PostgresStore) GetTodo(ctx context.Context, id int) (Todo, error) {
 		&todo.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Todo{}, errTodoNotFound
+		return model.Todo{}, model.ErrTodoNotFound
 	}
 	return todo, err
 }
 
-func (s *PostgresStore) UpdateTodo(ctx context.Context, id int, req UpdateTodoRequest) (Todo, error) {
-	var todo Todo
-	err := s.db.QueryRowContext(ctx, `
+func (r *PostgresRepository) UpdateTodo(ctx context.Context, id int, req model.UpdateTodoRequest) (model.Todo, error) {
+	var todo model.Todo
+	err := r.db.QueryRowContext(ctx, `
 		UPDATE todos
 		SET title = $1,
 			description = $2,
@@ -104,13 +115,13 @@ func (s *PostgresStore) UpdateTodo(ctx context.Context, id int, req UpdateTodoRe
 		&todo.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Todo{}, errTodoNotFound
+		return model.Todo{}, model.ErrTodoNotFound
 	}
 	return todo, err
 }
 
-func (s *PostgresStore) DeleteTodo(ctx context.Context, id int) error {
-	result, err := s.db.ExecContext(ctx, `DELETE FROM todos WHERE id = $1`, id)
+func (r *PostgresRepository) DeleteTodo(ctx context.Context, id int) error {
+	result, err := r.db.ExecContext(ctx, `DELETE FROM todos WHERE id = $1`, id)
 	if err != nil {
 		return err
 	}
@@ -121,15 +132,15 @@ func (s *PostgresStore) DeleteTodo(ctx context.Context, id int) error {
 	}
 
 	if rowsAffected == 0 {
-		return errTodoNotFound
+		return model.ErrTodoNotFound
 	}
 
 	return nil
 }
 
-func (s *PostgresStore) ToggleTodoComplete(ctx context.Context, id int) (Todo, error) {
-	var todo Todo
-	err := s.db.QueryRowContext(ctx, `
+func (r *PostgresRepository) ToggleTodoComplete(ctx context.Context, id int) (model.Todo, error) {
+	var todo model.Todo
+	err := r.db.QueryRowContext(ctx, `
 		UPDATE todos
 		SET completed = NOT completed,
 			updated_at = NOW()
@@ -144,7 +155,7 @@ func (s *PostgresStore) ToggleTodoComplete(ctx context.Context, id int) (Todo, e
 		&todo.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Todo{}, errTodoNotFound
+		return model.Todo{}, model.ErrTodoNotFound
 	}
 	return todo, err
 }

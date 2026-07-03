@@ -8,24 +8,26 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"go-todo/internal/handler"
+	"go-todo/internal/model"
+	"go-todo/internal/service"
 )
 
 func TestCreateTodoHandler(t *testing.T) {
 	store := newMemoryTodoStore(nil, 1)
-	todoStore = store
-	todoService = NewTodoService(store)
 
 	body := bytes.NewBufferString(`{"title":"Goを学習する","description":"POST /todosを作る"}`)
 	req := httptest.NewRequest(http.MethodPost, "/todos", body)
 	rec := httptest.NewRecorder()
 
-	newRouter().ServeHTTP(rec, req)
+	newTestRouter(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("expected status %d, got %d", http.StatusCreated, rec.Code)
 	}
 
-	var todo Todo
+	var todo model.Todo
 	if err := json.NewDecoder(rec.Body).Decode(&todo); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -45,20 +47,18 @@ func TestCreateTodoHandler(t *testing.T) {
 
 func TestCreateTodoHandlerTrimsInput(t *testing.T) {
 	store := newMemoryTodoStore(nil, 1)
-	todoStore = store
-	todoService = NewTodoService(store)
 
 	body := bytes.NewBufferString(`{"title":"  Goを学習する  ","description":"  空白を取り除く  "}`)
 	req := httptest.NewRequest(http.MethodPost, "/todos", body)
 	rec := httptest.NewRecorder()
 
-	newRouter().ServeHTTP(rec, req)
+	newTestRouter(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("expected status %d, got %d", http.StatusCreated, rec.Code)
 	}
 
-	var todo Todo
+	var todo model.Todo
 	if err := json.NewDecoder(rec.Body).Decode(&todo); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -74,20 +74,18 @@ func TestCreateTodoHandlerTrimsInput(t *testing.T) {
 
 func TestCreateTodoHandlerValidationError(t *testing.T) {
 	store := newMemoryTodoStore(nil, 1)
-	todoStore = store
-	todoService = NewTodoService(store)
 
 	body := bytes.NewBufferString(`{"title":"   ","description":"titleが空です"}`)
 	req := httptest.NewRequest(http.MethodPost, "/todos", body)
 	rec := httptest.NewRecorder()
 
-	newRouter().ServeHTTP(rec, req)
+	newTestRouter(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
 	}
 
-	var errorResponse ErrorResponse
+	var errorResponse handler.ErrorResponse
 	if err := json.NewDecoder(rec.Body).Decode(&errorResponse); err != nil {
 		t.Fatalf("failed to decode error response: %v", err)
 	}
@@ -99,20 +97,18 @@ func TestCreateTodoHandlerValidationError(t *testing.T) {
 
 func TestCreateTodoHandlerTitleTooLong(t *testing.T) {
 	store := newMemoryTodoStore(nil, 1)
-	todoStore = store
-	todoService = NewTodoService(store)
 
-	body := bytes.NewBufferString(`{"title":"` + strings.Repeat("a", maxTitleLength+1) + `","description":"titleが長すぎます"}`)
+	body := bytes.NewBufferString(`{"title":"` + strings.Repeat("a", service.MaxTitleLength+1) + `","description":"titleが長すぎます"}`)
 	req := httptest.NewRequest(http.MethodPost, "/todos", body)
 	rec := httptest.NewRecorder()
 
-	newRouter().ServeHTTP(rec, req)
+	newTestRouter(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
 	}
 
-	var errorResponse ErrorResponse
+	var errorResponse handler.ErrorResponse
 	if err := json.NewDecoder(rec.Body).Decode(&errorResponse); err != nil {
 		t.Fatalf("failed to decode error response: %v", err)
 	}
@@ -124,7 +120,7 @@ func TestCreateTodoHandlerTitleTooLong(t *testing.T) {
 
 func TestGetTodoHandler(t *testing.T) {
 	now := time.Now()
-	store := newMemoryTodoStore(map[int]Todo{
+	store := newMemoryTodoStore(map[int]model.Todo{
 		1: {
 			ID:          1,
 			Title:       "Goを学習する",
@@ -134,19 +130,16 @@ func TestGetTodoHandler(t *testing.T) {
 			UpdatedAt:   now,
 		},
 	}, 2)
-	todoStore = store
-	todoService = NewTodoService(store)
-
 	req := httptest.NewRequest(http.MethodGet, "/todos/1", nil)
 	rec := httptest.NewRecorder()
 
-	newRouter().ServeHTTP(rec, req)
+	newTestRouter(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 
-	var todo Todo
+	var todo model.Todo
 	if err := json.NewDecoder(rec.Body).Decode(&todo); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -158,19 +151,17 @@ func TestGetTodoHandler(t *testing.T) {
 
 func TestGetTodoHandlerNotFound(t *testing.T) {
 	store := newMemoryTodoStore(nil, 1)
-	todoStore = store
-	todoService = NewTodoService(store)
 
 	req := httptest.NewRequest(http.MethodGet, "/todos/999", nil)
 	rec := httptest.NewRecorder()
 
-	newRouter().ServeHTTP(rec, req)
+	newTestRouter(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
 	}
 
-	var errorResponse ErrorResponse
+	var errorResponse handler.ErrorResponse
 	if err := json.NewDecoder(rec.Body).Decode(&errorResponse); err != nil {
 		t.Fatalf("failed to decode error response: %v", err)
 	}
@@ -182,7 +173,7 @@ func TestGetTodoHandlerNotFound(t *testing.T) {
 
 func TestUpdateTodoHandler(t *testing.T) {
 	now := time.Now()
-	store := newMemoryTodoStore(map[int]Todo{
+	store := newMemoryTodoStore(map[int]model.Todo{
 		1: {
 			ID:          1,
 			Title:       "古いタイトル",
@@ -192,20 +183,17 @@ func TestUpdateTodoHandler(t *testing.T) {
 			UpdatedAt:   now,
 		},
 	}, 2)
-	todoStore = store
-	todoService = NewTodoService(store)
-
 	body := bytes.NewBufferString(`{"title":"新しいタイトル","description":"新しい説明","completed":true}`)
 	req := httptest.NewRequest(http.MethodPut, "/todos/1", body)
 	rec := httptest.NewRecorder()
 
-	newRouter().ServeHTTP(rec, req)
+	newTestRouter(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 
-	var todo Todo
+	var todo model.Todo
 	if err := json.NewDecoder(rec.Body).Decode(&todo); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -225,7 +213,7 @@ func TestUpdateTodoHandler(t *testing.T) {
 
 func TestUpdateTodoHandlerDescriptionTooLong(t *testing.T) {
 	now := time.Now()
-	store := newMemoryTodoStore(map[int]Todo{
+	store := newMemoryTodoStore(map[int]model.Todo{
 		1: {
 			ID:          1,
 			Title:       "古いタイトル",
@@ -235,20 +223,17 @@ func TestUpdateTodoHandlerDescriptionTooLong(t *testing.T) {
 			UpdatedAt:   now,
 		},
 	}, 2)
-	todoStore = store
-	todoService = NewTodoService(store)
-
-	body := bytes.NewBufferString(`{"title":"新しいタイトル","description":"` + strings.Repeat("a", maxDescriptionLength+1) + `","completed":true}`)
+	body := bytes.NewBufferString(`{"title":"新しいタイトル","description":"` + strings.Repeat("a", service.MaxDescriptionLength+1) + `","completed":true}`)
 	req := httptest.NewRequest(http.MethodPut, "/todos/1", body)
 	rec := httptest.NewRecorder()
 
-	newRouter().ServeHTTP(rec, req)
+	newTestRouter(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
 	}
 
-	var errorResponse ErrorResponse
+	var errorResponse handler.ErrorResponse
 	if err := json.NewDecoder(rec.Body).Decode(&errorResponse); err != nil {
 		t.Fatalf("failed to decode error response: %v", err)
 	}
@@ -260,14 +245,12 @@ func TestUpdateTodoHandlerDescriptionTooLong(t *testing.T) {
 
 func TestUpdateTodoHandlerNotFound(t *testing.T) {
 	store := newMemoryTodoStore(nil, 1)
-	todoStore = store
-	todoService = NewTodoService(store)
 
 	body := bytes.NewBufferString(`{"title":"新しいタイトル","description":"新しい説明","completed":true}`)
 	req := httptest.NewRequest(http.MethodPut, "/todos/999", body)
 	rec := httptest.NewRecorder()
 
-	newRouter().ServeHTTP(rec, req)
+	newTestRouter(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
@@ -276,7 +259,7 @@ func TestUpdateTodoHandlerNotFound(t *testing.T) {
 
 func TestDeleteTodoHandler(t *testing.T) {
 	now := time.Now()
-	store := newMemoryTodoStore(map[int]Todo{
+	store := newMemoryTodoStore(map[int]model.Todo{
 		1: {
 			ID:          1,
 			Title:       "削除するTodo",
@@ -286,13 +269,10 @@ func TestDeleteTodoHandler(t *testing.T) {
 			UpdatedAt:   now,
 		},
 	}, 2)
-	todoStore = store
-	todoService = NewTodoService(store)
-
 	req := httptest.NewRequest(http.MethodDelete, "/todos/1", nil)
 	rec := httptest.NewRecorder()
 
-	newRouter().ServeHTTP(rec, req)
+	newTestRouter(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected status %d, got %d", http.StatusNoContent, rec.Code)
@@ -305,22 +285,24 @@ func TestDeleteTodoHandler(t *testing.T) {
 
 func TestDeleteTodoHandlerNotFound(t *testing.T) {
 	store := newMemoryTodoStore(nil, 1)
-	todoStore = store
-	todoService = NewTodoService(store)
 
 	req := httptest.NewRequest(http.MethodDelete, "/todos/999", nil)
 	rec := httptest.NewRecorder()
 
-	newRouter().ServeHTTP(rec, req)
+	newTestRouter(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
 	}
 }
 
+func newTestRouter(store *memoryTodoStore) http.Handler {
+	return handler.NewRouter(service.NewTodoService(store))
+}
+
 func TestCompleteTodoHandler(t *testing.T) {
 	now := time.Now()
-	store := newMemoryTodoStore(map[int]Todo{
+	store := newMemoryTodoStore(map[int]model.Todo{
 		1: {
 			ID:          1,
 			Title:       "完了にするTodo",
@@ -330,19 +312,16 @@ func TestCompleteTodoHandler(t *testing.T) {
 			UpdatedAt:   now,
 		},
 	}, 2)
-	todoStore = store
-	todoService = NewTodoService(store)
-
 	req := httptest.NewRequest(http.MethodPatch, "/todos/1/complete", nil)
 	rec := httptest.NewRecorder()
 
-	newRouter().ServeHTTP(rec, req)
+	newTestRouter(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 
-	var todo Todo
+	var todo model.Todo
 	if err := json.NewDecoder(rec.Body).Decode(&todo); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -358,7 +337,7 @@ func TestCompleteTodoHandler(t *testing.T) {
 
 func TestCompleteTodoHandlerTogglesBackToIncomplete(t *testing.T) {
 	now := time.Now()
-	store := newMemoryTodoStore(map[int]Todo{
+	store := newMemoryTodoStore(map[int]model.Todo{
 		1: {
 			ID:          1,
 			Title:       "未完了に戻すTodo",
@@ -368,13 +347,10 @@ func TestCompleteTodoHandlerTogglesBackToIncomplete(t *testing.T) {
 			UpdatedAt:   now,
 		},
 	}, 2)
-	todoStore = store
-	todoService = NewTodoService(store)
-
 	req := httptest.NewRequest(http.MethodPatch, "/todos/1/complete", nil)
 	rec := httptest.NewRecorder()
 
-	newRouter().ServeHTTP(rec, req)
+	newTestRouter(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
@@ -387,13 +363,11 @@ func TestCompleteTodoHandlerTogglesBackToIncomplete(t *testing.T) {
 
 func TestCompleteTodoHandlerNotFound(t *testing.T) {
 	store := newMemoryTodoStore(nil, 1)
-	todoStore = store
-	todoService = NewTodoService(store)
 
 	req := httptest.NewRequest(http.MethodPatch, "/todos/999/complete", nil)
 	rec := httptest.NewRecorder()
 
-	newRouter().ServeHTTP(rec, req)
+	newTestRouter(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)

@@ -4,17 +4,19 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"go-todo/internal/model"
 )
 
 type memoryTodoStore struct {
 	mu     sync.Mutex
-	todos  map[int]Todo
+	todos  map[int]model.Todo
 	nextID int
 }
 
-func newMemoryTodoStore(initialTodos map[int]Todo, nextID int) *memoryTodoStore {
+func newMemoryTodoStore(initialTodos map[int]model.Todo, nextID int) *memoryTodoStore {
 	if initialTodos == nil {
-		initialTodos = map[int]Todo{}
+		initialTodos = map[int]model.Todo{}
 	}
 
 	return &memoryTodoStore{
@@ -23,11 +25,11 @@ func newMemoryTodoStore(initialTodos map[int]Todo, nextID int) *memoryTodoStore 
 	}
 }
 
-func (s *memoryTodoStore) ListTodos(ctx context.Context) ([]Todo, error) {
+func (s *memoryTodoStore) ListTodos(ctx context.Context) ([]model.Todo, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	todoList := make([]Todo, 0, len(s.todos))
+	todoList := make([]model.Todo, 0, len(s.todos))
 	for _, todo := range s.todos {
 		todoList = append(todoList, todo)
 	}
@@ -35,12 +37,12 @@ func (s *memoryTodoStore) ListTodos(ctx context.Context) ([]Todo, error) {
 	return todoList, nil
 }
 
-func (s *memoryTodoStore) CreateTodo(ctx context.Context, req CreateTodoRequest) (Todo, error) {
+func (s *memoryTodoStore) CreateTodo(ctx context.Context, req model.CreateTodoRequest) (model.Todo, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	now := time.Now()
-	todo := Todo{
+	todo := model.Todo{
 		ID:          s.nextID,
 		Title:       req.Title,
 		Description: req.Description,
@@ -55,25 +57,25 @@ func (s *memoryTodoStore) CreateTodo(ctx context.Context, req CreateTodoRequest)
 	return todo, nil
 }
 
-func (s *memoryTodoStore) GetTodo(ctx context.Context, id int) (Todo, error) {
+func (s *memoryTodoStore) GetTodo(ctx context.Context, id int) (model.Todo, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	todo, ok := s.todos[id]
 	if !ok {
-		return Todo{}, errTodoNotFound
+		return model.Todo{}, model.ErrTodoNotFound
 	}
 
 	return todo, nil
 }
 
-func (s *memoryTodoStore) UpdateTodo(ctx context.Context, id int, req UpdateTodoRequest) (Todo, error) {
+func (s *memoryTodoStore) UpdateTodo(ctx context.Context, id int, req model.UpdateTodoRequest) (model.Todo, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	todo, ok := s.todos[id]
 	if !ok {
-		return Todo{}, errTodoNotFound
+		return model.Todo{}, model.ErrTodoNotFound
 	}
 
 	todo.Title = req.Title
@@ -90,20 +92,20 @@ func (s *memoryTodoStore) DeleteTodo(ctx context.Context, id int) error {
 	defer s.mu.Unlock()
 
 	if _, ok := s.todos[id]; !ok {
-		return errTodoNotFound
+		return model.ErrTodoNotFound
 	}
 
 	delete(s.todos, id)
 	return nil
 }
 
-func (s *memoryTodoStore) ToggleTodoComplete(ctx context.Context, id int) (Todo, error) {
+func (s *memoryTodoStore) ToggleTodoComplete(ctx context.Context, id int) (model.Todo, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	todo, ok := s.todos[id]
 	if !ok {
-		return Todo{}, errTodoNotFound
+		return model.Todo{}, model.ErrTodoNotFound
 	}
 
 	todo.Completed = !todo.Completed
