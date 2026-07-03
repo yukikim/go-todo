@@ -365,6 +365,46 @@ func TestTodoRoutesRejectInvalidToken(t *testing.T) {
 	}
 }
 
+func TestCORSPreflightRequest(t *testing.T) {
+	store := newMemoryTodoStore(nil, 1)
+	req := httptest.NewRequest(http.MethodOptions, "/todos", nil)
+	req.Header.Set("Origin", "http://localhost:3000")
+	req.Header.Set("Access-Control-Request-Method", "GET")
+	req.Header.Set("Access-Control-Request-Headers", "Authorization")
+	rec := httptest.NewRecorder()
+
+	newRawTestRouter(store).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, rec.Code)
+	}
+
+	if rec.Header().Get("Access-Control-Allow-Origin") != "http://localhost:3000" {
+		t.Fatalf("expected Access-Control-Allow-Origin to be set")
+	}
+
+	if !strings.Contains(rec.Header().Get("Access-Control-Allow-Headers"), "Authorization") {
+		t.Fatalf("expected Authorization to be allowed")
+	}
+}
+
+func TestCORSActualRequestIncludesHeaders(t *testing.T) {
+	store := newMemoryTodoStore(nil, 1)
+	req := httptest.NewRequest(http.MethodGet, "/todos", nil)
+	req.Header.Set("Origin", "http://localhost:3000")
+	rec := httptest.NewRecorder()
+
+	newRawTestRouter(store).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+	}
+
+	if rec.Header().Get("Access-Control-Allow-Origin") != "http://localhost:3000" {
+		t.Fatalf("expected Access-Control-Allow-Origin to be set")
+	}
+}
+
 func newTestRouter(store *memoryTodoStore) http.Handler {
 	router := newRawTestRouter(store)
 	token, err := newTestAuthService().GenerateToken("admin")
@@ -379,7 +419,7 @@ func newTestRouter(store *memoryTodoStore) http.Handler {
 }
 
 func newRawTestRouter(store *memoryTodoStore) http.Handler {
-	return handler.NewRouter(service.NewTodoService(store), newTestAuthService())
+	return handler.NewRouter(service.NewTodoService(store), newTestAuthService(), []string{"http://localhost:3000"})
 }
 
 func newTestAuthService() *service.AuthService {

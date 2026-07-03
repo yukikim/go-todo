@@ -8,10 +8,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewRouter(todoService *service.TodoService, authService *service.AuthService) *gin.Engine {
+func NewRouter(todoService *service.TodoService, authService *service.AuthService, allowedOrigins []string) *gin.Engine {
 	todoHandler := NewTodoHandler(todoService)
 	authHandler := NewAuthHandler(authService)
 	r := gin.Default()
+
+	r.Use(CORSMiddleware(allowedOrigins))
 
 	r.NoRoute(func(c *gin.Context) {
 		writeError(c, http.StatusNotFound, "not found")

@@ -416,6 +416,7 @@ curl -X POST http://localhost:8080/login \
 AUTH_USERNAME=admin
 AUTH_PASSWORD=password
 JWT_SECRET=go-todo-dev-secret
+CORS_ALLOWED_ORIGINS=http://localhost:3000
 ```
 
 別の値を使う場合は、サーバー起動前に指定してください。
@@ -424,6 +425,7 @@ JWT_SECRET=go-todo-dev-secret
 export AUTH_USERNAME="admin"
 export AUTH_PASSWORD="password"
 export JWT_SECRET="your-secret"
+export CORS_ALLOWED_ORIGINS="http://localhost:3000"
 ```
 
 ### ログイン
@@ -485,6 +487,33 @@ JWT を検証
   ↓
 TodoHandler
 ```
+
+---
+
+## CORS middleware を追加する
+
+Next.js など別オリジンのフロントエンドから Go API を呼び出すため、現在の実装では CORS middleware を追加しています。
+
+未指定の場合は、Next.js のローカル開発サーバーを想定して以下を許可します。
+
+```bash
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+```
+
+複数のオリジンを許可したい場合は、カンマ区切りで指定します。
+
+```bash
+export CORS_ALLOWED_ORIGINS="http://localhost:3000,http://localhost:3001"
+```
+
+許可している内容は以下です。
+
+```txt
+Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+Access-Control-Allow-Headers: Content-Type, Authorization
+```
+
+`Authorization` ヘッダーを許可しているため、フロントエンドから JWT を付けて Todo API を呼び出せます。
 
 ---
 
