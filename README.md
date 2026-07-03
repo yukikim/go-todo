@@ -283,6 +283,85 @@ type TodoRepository interface {
 
 ---
 
+## テストを書く
+
+Go では、`*_test.go` という名前のファイルにテストを書きます。
+
+実行コマンドは以下です。
+
+```bash
+go test ./...
+```
+
+`./...` は、現在のディレクトリ以下のすべてのパッケージをテストするという意味です。
+
+### このプロジェクトのテスト構成
+
+現在は、主に2種類のテストを書いています。
+
+```txt
+main_test.go
+  router + handler のテスト
+
+internal/service/todo_service_test.go
+  service 層の単体テスト
+```
+
+### handler テスト
+
+`main_test.go` では、HTTP リクエストに近い形で handler をテストしています。
+
+```go
+req := httptest.NewRequest(http.MethodPost, "/todos", body)
+rec := httptest.NewRecorder()
+
+newTestRouter(store).ServeHTTP(rec, req)
+```
+
+このテストでは、以下を確認できます。
+
+- ルーティングが正しく動くか
+- HTTP ステータスコードが正しいか
+- JSON レスポンスが正しいか
+- エラー時のレスポンス形式が正しいか
+
+Gin を使っている場合、handler 関数を直接呼ぶより、router 経由でリクエストする方が自然です。
+
+### service テスト
+
+`internal/service/todo_service_test.go` では、HTTP を通さずに service 層だけをテストしています。
+
+このテストでは、以下を確認できます。
+
+- `title` や `description` のバリデーションが正しいか
+- 前後の空白が取り除かれるか
+- バリデーションエラー時に repository が呼ばれないか
+- repository から返る `ErrTodoNotFound` がそのまま扱えるか
+- 完了状態の切り替え処理が正しいか
+
+service テストでは、PostgreSQL ではなく fake repository を使っています。
+
+```go
+repo := newFakeTodoRepository(nil, 1)
+service := NewTodoService(repo)
+```
+
+これにより、DB を起動しなくても service の処理ルールだけを高速に確認できます。
+
+### テストの種類
+
+このプロジェクトでは、次のように考えると整理しやすいです。
+
+- unit test: service のように、1つの層だけを小さく確認する
+- handler test: HTTP リクエストに近い形で、router と handler を確認する
+- integration test: 実際の PostgreSQL に接続して、repository まで含めて確認する
+
+現在追加しているのは、unit test と handler test です。
+
+PostgreSQL を使った integration test は、Docker やテスト用DBの準備が必要になるため、次の段階で追加するとよいです。
+
+---
+
 ## PostgreSQL に保存する
 
 現在の実装では、Todo をメモリ上の map ではなく PostgreSQL に保存します。
